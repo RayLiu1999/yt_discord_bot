@@ -125,7 +125,7 @@ async function execute() {
               timeDiff = parseInt(time) / 3600;
             }
 
-            const publishTime = new Date(now.getTime() - timeDiff * 60 * 60 * 500);
+            const publishTime = new Date(now.getTime() - timeDiff * 60 * 60 * 1000);
 
             if (publishTime.getDate() !== now.getDate()) {
               continue;
