@@ -1,6 +1,7 @@
 const puppeteer = require("puppeteer");
 const fs = require("fs");
 
+delete require.cache[require.resolve("./bbq_mans.json")];
 const bbq_mans = require("./bbq_mans.json").data;
 const YT_domain = "https://www.youtube.com";
 
@@ -42,6 +43,7 @@ async function execute() {
 
       await delay(500);
 
+      await page.setDefaultNavigationTimeout(30000);
       await page.goto(url);
 
       const status = await page.evaluate(() => document.readyState);
@@ -50,13 +52,13 @@ async function execute() {
       }
 
       // wait for page loading
-      await delay(500);
+      await delay(300);
 
       // get channel title
       let channelTitleHandle = await page.$("#text-container");
 
       // wait for page loading
-      await delay(500);
+      await delay(300);
 
       if (channelTitleHandle === null || channelTitleHandle === undefined) {
         throw new Error("找不到頻道");
@@ -69,7 +71,7 @@ async function execute() {
       let elementHandle = await page.$("#contents:first-child");
       
       // wait for page loading
-      await delay(500);
+      await delay(300);
 
       if (elementHandle === null || elementHandle === undefined) {
         throw new Error("找不到影片");
@@ -78,7 +80,7 @@ async function execute() {
       let element = await elementHandle.asElement();
 
       // wait for page loading
-      await delay(500);
+      await delay(300);
 
       let videos = await page.evaluate(
         (element, channelTitle, sendedVideos) => {
@@ -136,7 +138,7 @@ async function execute() {
               title: video.querySelector("#video-title").textContent,
               link: video.querySelector("#video-title-link").href,
               pic: video.querySelector("yt-image img").src,
-              time: video
+              time: video 
                 .querySelector("#overlays")
                 .textContent.replace(/\n|\s/g, ""),
               views: views,
@@ -155,7 +157,7 @@ async function execute() {
 
       await browser.close();
 
-      await delay(500);
+      await delay(300);
 
       batchPromises.push(Promise.resolve());
     }
@@ -169,10 +171,7 @@ async function execute() {
         if (err) throw err;
       });
 
-      if (videosInfo.length === 0) {
-        throw new Error("沒有新影片！");
-      }
-      else {
+      if (videosInfo.length > 0) {
         fs.writeFile("sendedVideos.json", JSON.stringify(sendedVideos.concat(videosInfo)), (err) => {
           if (err) throw err;
         });

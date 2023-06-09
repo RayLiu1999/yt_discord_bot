@@ -155,29 +155,85 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 // 自動發送
-// client.on(Events.ClientReady, async (c) => {
-//   const bbq_mans = require("./bbq_mans.json");
-//   const videos = require("./videos.json");
+client.on(Events.ClientReady, async (c) => {
+  // 计算距离下一个整点或半点的时间
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const seconds = now.getSeconds();
+  const milliseconds = now.getMilliseconds();
+  const timeToNextHalfHour = (30 - minutes % 30) * 60 * 1000 - seconds * 1000 - milliseconds;
+  const timeToNextHour = (60 - minutes) * 60 * 1000 - seconds * 1000 - milliseconds;
 
-//   if (videos.length === 0) {
-//     c.channels.cache
-//       .get(channelId)
-//       .send("最新影片皆已發送！")
-//       .catch((error) => {
-//         console.log(error);
-//       });
-//     return;
-//   }
+  const fs = require('fs');
+  const crawler = require("./crawler.js");
 
-//   try {
-//     for (video of videos) {
-//       await c.channels.cache.get(bbq_mans.data[0]).send(video.link);
-//       await setTimeout(() => {}, 300);
-//     }
-//   } catch (error) {
-//     console.log(error);
-//   }
-// });
+  // 每半小時執行一次
+  setTimeout(() => {
+    setInterval(async () => {
+      // 午夜12點則不執行
+      if (new Date().getHours() === 0 && new Date().getMinutes() === 0) return;
+
+      await execute();
+    }, 30 * 60 * 1000);
+  }, timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour);
+
+  // 每天午夜11點59分59秒執行一次(確保資料有獲取)
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const timeToTarget = target.getTime() - now.getTime();
+  setTimeout(() => {
+    setInterval(async () => {
+      await execute();
+    }, 24 * 60 * 60 * 1000);
+  }, timeToTarget);
+
+  async function execute() {
+    try {
+      // 執行爬蟲
+      await crawler();
+
+      await setTimeout(() => {}, 300);
+
+      // 獲取發送清單
+      fs.readFile('./videos.json', 'utf8', (err, data) => {
+        if (err) throw err;
+        let videos;
+
+        if (data === undefined || data === null || data === "") {
+          videos = [];
+        }
+        else {
+          videos = JSON.parse(data);
+        }
+
+        if (videos.length === 0) {
+          c.channels.cache
+          .get(channelId)
+          .send("最新影片皆已發送！")
+          return;
+        }
+
+        for (let video of videos) {
+          c.channels.cache
+          .get(channelId)
+          .send(video.link)
+
+          setTimeout(() => {}, 300);
+        }
+
+        c.channels.cache
+        .get(channelId)
+        .send("影片發送成功！")
+      });
+
+    } catch (error) {
+      console.log(error);
+
+      await c.channels.cache
+      .get(channelId)
+      .send(error.message)
+    }
+  }
+});
 
 
 // When the client is ready, run this code (only once)
