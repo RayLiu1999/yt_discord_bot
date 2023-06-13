@@ -107,7 +107,7 @@ client.on(Events.MessageCreate, async (message) => {
       try {
         for (video of videos) {
           await message.channel.send(video.link);
-          await setTimeout(() => {}, 300);
+          await delay(300);
         }
       } catch (error) {
         await message.reply(error.message);
@@ -130,6 +130,13 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     const bbq_mans = require("./bbq_mans.json");
+    
+    // 檢查是否已存在
+    if (bbq_mans.data.includes(channelID)) {
+      message.channel.send("此頻道已存在！");
+      return;
+    }
+
     bbq_mans.data.push(channelID);
     fs.writeFile("bbq_mans.json", JSON.stringify(bbq_mans), (err) => {
       if (err) throw err;
@@ -148,7 +155,7 @@ client.on(Events.MessageCreate, async (message) => {
     const bbq_mans = require("./bbq_man.json");
     bbq_mans.data = bbq_mans.data.filter((item) => item !== channelID);
     fs.writeFile("bbq_man.json", JSON.stringify(bbq_mans), (err) => {
-      if (err) throw err;
+      if (err) throw err; 
       message.channel.send("刪除成功！");
     });
   }
@@ -167,15 +174,54 @@ client.on(Events.ClientReady, async (c) => {
   const fs = require('fs');
   const crawler = require("./crawler.js");
 
-  // 每半小時執行一次
-  setTimeout(() => {
-    setInterval(async () => {
-      // 午夜12點則不執行
-      if (new Date().getHours() === 0 && new Date().getMinutes() === 0) return;
+  let intervalTime = timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour
+  async function startTimer() {
+    console.log('first:'+intervalTime);
+    setTimeout(async () => {
+      // 開始執行時間
+      console.log("開始執行時間：" + new Date().toLocaleString());
+      
+      let executeHour = new Date().getHours();
+      let executeMinute = new Date().getMinutes();
 
+      // 午夜12點則不執行
+      if (executeHour === 0 && executeMinute === 0) return;
       await execute();
-    }, 30 * 60 * 1000);
-  }, timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour);
+
+      // 判斷當下時間偏差
+      let curMinutes = new Date().getMinutes();
+      let curSeconds = new Date().getSeconds();
+      let curMilliseconds = new Date().getMilliseconds();
+      let diff = (curMinutes - executeMinute) * 60 * 1000 + (curSeconds - 0) * 1000 + (curMilliseconds - 0);
+
+      // 重新計算時間
+      intervalTime = 30 * 60 * 1000 - diff;
+  
+      // 重新启动定时器 
+      await startTimer();
+    }, intervalTime);
+  }
+
+  await startTimer();
+
+  // setTimeout(async() => {
+  //   // 午夜12點則不執行
+  //   if (new Date().getHours() !== 0 || new Date().getMinutes() !== 0) {
+  //     // 第一次執行
+  //     await execute();
+  //   }
+
+  //   // 每半小時執行一次
+  //   setInterval(async () => {
+  //     let executeHour = new Date().getHours();
+  //     let executeMinute = new Date().getMinutes();
+
+  //     // 午夜12點則不執行
+  //     if (executeHour === 0 && executeMinute === 0) return;
+  //     await execute();
+
+  //   }, 30 * 60 * 1000 - diff);
+  // }, timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour);
 
   // 每天午夜11點59分59秒執行一次(確保資料有獲取)
   const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
@@ -191,7 +237,7 @@ client.on(Events.ClientReady, async (c) => {
       // 執行爬蟲
       await crawler();
 
-      await setTimeout(() => {}, 300);
+      await delay(300);
 
       // 獲取發送清單
       fs.readFile('./videos.json', 'utf8', (err, data) => {
@@ -206,10 +252,11 @@ client.on(Events.ClientReady, async (c) => {
         }
 
         if (videos.length === 0) {
-          c.channels.cache
-          .get(channelId)
-          .send("最新影片皆已發送！")
-          return;
+          console.log('最新影片皆已發送！');
+          // c.channels.cache
+          // .get(channelId)
+          // .send("最新影片皆已發送！")
+          // return;
         }
 
         for (let video of videos) {
@@ -220,9 +267,9 @@ client.on(Events.ClientReady, async (c) => {
           setTimeout(() => {}, 300);
         }
 
-        c.channels.cache
-        .get(channelId)
-        .send("影片發送成功！")
+        // c.channels.cache
+        // .get(channelId)
+        // .send("影片發送成功！")
       });
 
     } catch (error) {
@@ -234,6 +281,10 @@ client.on(Events.ClientReady, async (c) => {
     }
   }
 });
+
+async function delay(time) {
+  await new Promise((resolve) => setTimeout(resolve, time));
+}
 
 
 // When the client is ready, run this code (only once)
