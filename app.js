@@ -181,12 +181,24 @@ client.on(Events.ClientReady, async (c) => {
       // 開始執行時間
       console.log("開始執行時間：" + new Date().toLocaleString());
       
+      let timeInterval = 30 * 60 * 1000; // 時間間隔(預設30分鐘)
       let executeHour = new Date().getHours();
       let executeMinute = new Date().getMinutes();
 
       // 午夜12點則不執行
-      if (executeHour === 0 && executeMinute === 0) return;
-      await execute();
+      if (executeHour !== 0 || executeMinute !== 0) {
+        await execute();
+      }
+
+      // 假設現在為午夜11:30，下一次間隔改為20分鐘
+      if (executeHour === 23 && executeMinute === 30) {
+        timeInterval = 20 * 60 * 1000;
+      }
+
+      // 假設現在為午夜11:50，下一次間隔改為40分鐘
+      if (executeHour === 23 && executeMinute === 50) {
+        timeInterval = 40 * 60 * 1000;
+      }
 
       // 判斷當下時間偏差
       let curMinutes = new Date().getMinutes();
@@ -194,8 +206,8 @@ client.on(Events.ClientReady, async (c) => {
       let curMilliseconds = new Date().getMilliseconds();
       let diff = (curMinutes - executeMinute) * 60 * 1000 + (curSeconds - 0) * 1000 + (curMilliseconds - 0);
 
-      // 重新計算時間
-      intervalTime = 30 * 60 * 1000 - diff;
+      // 重新計算時間(間隔 - 偏差)
+      intervalTime = timeInterval - diff;
   
       // 重新启动定时器 
       await startTimer();
