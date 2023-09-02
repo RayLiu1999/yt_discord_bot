@@ -71,6 +71,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 // 自訂指令
 client.on(Events.MessageCreate, async (message) => {
   const prefix = "!";
+  delete require.cache[require.resolve("./channels.json")];
+  let channels = require("./channels.json").data;
+
+  delete require.cache[require.resolve("./videos.json")];
+  const videos = require("./videos.json");
 
   // 取影片連結
   switch (message.content) {
@@ -89,35 +94,43 @@ client.on(Events.MessageCreate, async (message) => {
 
     // 取影片
     case prefix + "vd":
-      delete require.cache[require.resolve("./videos.json")];
-      const videos = require("./videos.json");
-
       if (videos.length === 0) {
         message.channel.send("最新影片皆已發送！");
         return;
       }
 
-      // let links = [];
-      // for (video of videos) {
-      //   links.push(video.link);
-      // }
-
-      // message.channel.send(links.join("\n"));
-      
-      try {
-        for (video of videos) {
-          await message.channel.send(video.link);
-          await delay(300);
-        }
-      } catch (error) {
-        await message.reply(error.message);
+      // 一次發送
+      let links = [];
+      for (video of videos) {
+        links.push(video.link);
       }
+
+      message.channel.send(links.join("\n"));
+      return false;
+      
+      // 逐一發送
+      // try {
+      //   for (video of videos) {
+      //     await message.channel.send(video.link);
+      //     await delay(300);
+      //   }
+      // } catch (error) {
+      //   await message.reply(error.message);
+      // }
       break;
 
     // 抓清單
     case prefix + "ls":
-      const bbq_mans = require("./bbq_mans.json");
-      message.channel.send(bbq_mans.data.join("\n"));
+      let sendStr = "";
+      channels.forEach(function (item) {
+        if (item.last_updated == '') {
+          item.last_updated = '無';
+        }
+
+        sendStr += `${item.channelId} - ${item.last_updated}\n`;
+      });
+
+      message.channel.send(sendStr);
       break;
   }
 
@@ -128,17 +141,19 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel.send("請輸入頻道ID！");
       return;
     }
-
-    const bbq_mans = require("./bbq_mans.json");
     
     // 檢查是否已存在
-    if (bbq_mans.data.includes(channelID)) {
+    if (channels.some((item) => item.channelId === channelID)) {
       message.channel.send("此頻道已存在！");
       return;
     }
 
-    bbq_mans.data.push(channelID);
-    fs.writeFile("bbq_mans.json", JSON.stringify(bbq_mans), (err) => {
+    channels.push({
+      channelId: channelID,
+      last_updated: "",
+    });
+
+    fs.writeFile("channels.json", JSON.stringify({data: channels}), (err) => {
       if (err) throw err;
       message.channel.send("新增成功！");
     });
@@ -152,9 +167,9 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    const bbq_mans = require("./bbq_man.json");
-    bbq_mans.data = bbq_mans.data.filter((item) => item !== channelID);
-    fs.writeFile("bbq_man.json", JSON.stringify(bbq_mans), (err) => {
+    channels = channels.filter((item) => item.channelId !== channelID);
+
+    fs.writeFile("channels.json", JSON.stringify({data: channels}), (err) => {
       if (err) throw err; 
       message.channel.send("刪除成功！");
     });
@@ -265,19 +280,27 @@ client.on(Events.ClientReady, async (c) => {
 
         if (videos.length === 0) {
           console.log('最新影片皆已發送！');
-          // c.channels.cache
-          // .get(channelId)
-          // .send("最新影片皆已發送！")
-          // return;
         }
 
-        for (let video of videos) {
-          c.channels.cache
-          .get(channelId)
-          .send(video.link)
-
-          setTimeout(() => {}, 300);
+        // 一次發送
+        let links = [];
+        for (video of videos) {
+          links.push(video.link);
         }
+
+        c.channels.cache
+        .get(channelId)
+        .send(links.join("\n"));
+        return false;
+
+        // 逐一發送
+        // for (let video of videos) {
+        //   c.channels.cache
+        //   .get(channelId)
+        //   .send(video.link)
+
+        //   setTimeout(() => {}, 300);
+        // }
 
         // c.channels.cache
         // .get(channelId)
@@ -289,7 +312,8 @@ client.on(Events.ClientReady, async (c) => {
 
       await c.channels.cache
       .get(channelId)
-      .send(error.message)
+      .send('影片發送失敗！')
+      // .send(error.message)
     }
   }
 });

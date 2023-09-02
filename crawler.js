@@ -1,8 +1,13 @@
 const puppeteer = require("puppeteer");
 const fs = require("fs");
 
-delete require.cache[require.resolve("./bbq_mans.json")];
-const bbq_mans = require("./bbq_mans.json").data;
+delete require.cache[require.resolve("./channels.json")];
+let channels = require("./channels.json").data;
+let bbqChannelIds = [];
+channels.forEach(function (item) {
+  bbqChannelIds.push(item.channelId);
+});
+
 const YT_domain = "https://www.youtube.com";
 
 let type = ["videos", "streams", "community"];
@@ -31,8 +36,8 @@ async function execute() {
   let videosInfo = [];
   let promises = [];
 
-  for (let i = 0; i < bbq_mans.length; i += 4) {
-    let batch = bbq_mans.slice(i, i + 4);
+  for (let i = 0; i < bbqChannelIds.length; i += 4) {
+    let batch = bbqChannelIds.slice(i, i + 4);
 
     let batchPromises = [];
 
@@ -56,6 +61,9 @@ async function execute() {
 
       // get channel title
       let channelTitleHandle = await page.$("#text-container");
+      
+      // fet channel id
+      let channelIdHandle = await page.$("#channel-handle");
 
       // wait for page loading
       await delay(300);
@@ -65,6 +73,10 @@ async function execute() {
       }
 
       let channelTitle = await channelTitleHandle.evaluate(
+        (el) => el.textContent
+      );
+
+      let channelId = await channelIdHandle.evaluate(
         (el) => el.textContent
       );
 
@@ -83,7 +95,7 @@ async function execute() {
       await delay(300);
 
       let videos = await page.evaluate(
-        (element, channelTitle, sendedVideos) => {
+        (element, channelTitle, sendedVideos, channelId) => {
           let videos = element.querySelectorAll(".style-scope.ytd-rich-grid-row");
           let info = [];
 
@@ -144,16 +156,18 @@ async function execute() {
               views: views,
               date: time,
               channel: channelTitle.replace(/\n|\s/g, ""),
+              channelId: channelId
             });
           }
           return info;
         },
         element,
         channelTitle,
-        sendedVideos
+        sendedVideos,
+        channelId
       );
 
-      await videosInfo.push(...videos);
+      videosInfo.push(...videos);
 
       await browser.close();
 
@@ -167,12 +181,38 @@ async function execute() {
 
   await Promise.all(promises)
   .then((results) => {
-      fs.writeFile("videos.json", JSON.stringify(videosInfo), (err) => {
+      // 寫入發送清單
+      fs.writeFile("./videos.json", JSON.stringify(videosInfo), (err) => {
+        if (err) throw err;
+      });
+      
+
+      // 更新烤肉man時間
+      let sendedBbqMans = [];
+      for (let video of videosInfo) {
+        if (!sendedBbqMans.includes(video.channelId)) {
+          sendedBbqMans.push(video.channelId);
+        }
+      }
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const day = now.getDate();
+      channels.forEach(function (item) {
+        if (sendedBbqMans.includes(item.channelId)) {
+          item.last_updated = `${year}/${month}/${day}`;
+        }
+      });
+
+      fs.writeFile("./channels.json", JSON.stringify({ data: channels }), (err) => {
         if (err) throw err;
       });
 
+
+      // 寫入已發送清單
       if (videosInfo.length > 0) {
-        fs.writeFile("sendedVideos.json", JSON.stringify(sendedVideos.concat(videosInfo)), (err) => {
+        fs.writeFile("./sendedVideos.json", JSON.stringify(sendedVideos.concat(videosInfo)), (err) => {
           if (err) throw err;
         });
         console.log("本日影片已儲存！");
