@@ -88,7 +88,7 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.send("影片抓取成功！");
       } catch (error) {
         console.log(error);
-        await message.reply(error.message);
+        await message.reply("影片抓取失敗！");
       }
       break;
 
@@ -96,27 +96,26 @@ client.on(Events.MessageCreate, async (message) => {
     case prefix + "vd":
       if (videos.length === 0) {
         message.channel.send("最新影片皆已發送！");
-        return;
+        return false;
       }
 
-      // 一次發送
+      // 每次發送5個
       let links = [];
-      for (video of videos) {
-        links.push(video.link);
+      for (let i = 0; i < videos.length; i++) {
+        if (links.includes(videos[i].link)) continue;
+
+        links.push(videos[i].link);
+
+        if (links.length === 5) {
+          message.channel.send(links.join("\n"));
+          links = []; // 清空
+        }
       }
 
-      message.channel.send(links.join("\n"));
-      return false;
-      
-      // 逐一發送
-      // try {
-      //   for (video of videos) {
-      //     await message.channel.send(video.link);
-      //     await delay(300);
-      //   }
-      // } catch (error) {
-      //   await message.reply(error.message);
-      // }
+      // 發送剩餘的
+      if (links.length > 0) {
+        message.channel.send(links.join("\n"));
+      }
       break;
 
     // 抓清單
@@ -280,31 +279,32 @@ client.on(Events.ClientReady, async (c) => {
 
         if (videos.length === 0) {
           console.log('最新影片皆已發送！');
+          return false;
         }
 
         // 一次發送
         let links = [];
-        for (video of videos) {
-          links.push(video.link);
+        for (let i = 0; i < videos.length; i++) {
+          if (links.includes(videos[i].link)) continue;
+
+          links.push(videos[i].link);
+
+          // 每次發送5個
+          if (links.length === 5) {
+            c.channels.cache
+            .get(channelId)
+            .send(links.join("\n"));
+
+            links = []; // 清空
+          }
         }
 
-        c.channels.cache
-        .get(channelId)
-        .send(links.join("\n"));
-        return false;
-
-        // 逐一發送
-        // for (let video of videos) {
-        //   c.channels.cache
-        //   .get(channelId)
-        //   .send(video.link)
-
-        //   setTimeout(() => {}, 300);
-        // }
-
-        // c.channels.cache
-        // .get(channelId)
-        // .send("影片發送成功！")
+        // 發送剩餘的
+        if (links.length > 0) {
+          c.channels.cache
+          .get(channelId)
+          .send(links.join("\n"));
+        }
       });
 
     } catch (error) {
@@ -312,7 +312,7 @@ client.on(Events.ClientReady, async (c) => {
 
       await c.channels.cache
       .get(channelId)
-      .send('影片發送失敗！')
+      .send('影片抓取失敗！')
       // .send(error.message)
     }
   }
