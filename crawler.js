@@ -1,4 +1,4 @@
-const puppeteer = require("puppeteer");
+// const puppeteer = require("puppeteer");
 const fs = require("fs");
 const YT_domain = "https://www.youtube.com";
 
@@ -301,13 +301,13 @@ function checkTime(time) {
   const now = new Date();
   let timeDiff;
 
-  if (time.includes('時')) {
+  if (time.includes('hours')) {
     timeDiff = parseInt(time);
   }
-  else if (time.includes('分')) {
+  else if (time.includes('minutes')) {
     timeDiff = parseInt(time) / 60;
   }
-  else if (time.includes('秒')) {
+  else if (time.includes('seconds')) {
     timeDiff = parseInt(time) / 3600;
   }
 

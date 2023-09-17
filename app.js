@@ -1,9 +1,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
+require('dotenv').config();
 
 // Require the necessary discord.js classes
 const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
-const { token, channelId } = require("./config.json");
+const token = process.env.TOKEN;
+const channelId = process.env.CHANNELID;
 
 // Create a new client instance
 const client = new Client({
@@ -190,10 +192,12 @@ client.on(Events.ClientReady, async (c) => {
 
   let intervalTime = timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour
   async function startTimer() {
-    console.log('first:'+intervalTime);
+    console.log('啟動時間：' + new Date().toLocaleString());
+    console.log('距離下一次執行時間：' + Math.round(intervalTime / 1000 / 60 * 10) / 10 + '分鐘');
+
     setTimeout(async () => {
       // 開始執行時間
-      console.log("開始執行時間：" + new Date().toLocaleString());
+      console.log("開始抓取時間：" + new Date().toLocaleString());
       
       let timeInterval = 30 * 60 * 1000; // 時間間隔(預設30分鐘)
       let executeHour = new Date().getHours();
@@ -202,6 +206,7 @@ client.on(Events.ClientReady, async (c) => {
       // 午夜12點則不執行
       if (executeHour !== 0 || executeMinute !== 0) {
         await execute();
+        console.log("結束抓取時間：" + new Date().toLocaleString());
       }
 
       // 假設現在為午夜11:30，下一次間隔改為20分鐘

@@ -1,7 +1,7 @@
 node_modules
-config.json
 channels.json
 sendedVideos.json
 videos.json
 lastTime.json
 *.txt
+.env
