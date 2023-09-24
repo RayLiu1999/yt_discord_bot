@@ -5,7 +5,8 @@ require('dotenv').config();
 // Require the necessary discord.js classes
 const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
 const token = process.env.TOKEN;
-const channelId = process.env.CHANNELID;
+const videoChannelId = process.env.VIDEO_CHANNELID;
+const streamChannelId = process.env.STREAM_CHANNELID;
 
 // Create a new client instance
 const client = new Client({
@@ -73,11 +74,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 // 自訂指令
 client.on(Events.MessageCreate, async (message) => {
   const prefix = "!";
-  delete require.cache[require.resolve("./channels.json")];
-  let channels = require("./channels.json").data;
+  delete require.cache[require.resolve("./videosChannels.json")];
+  let videosChannels = require("./videosChannels.json").data;
+
+  delete require.cache[require.resolve("./streamsChannels.json")];
+  let streamsChannels = require("./streamsChannels.json").data;
 
   delete require.cache[require.resolve("./videos.json")];
   const videos = require("./videos.json");
+
+  delete require.cache[require.resolve("./streams.json")];
+  const streams = require("./streams.json");
 
   // 取影片連結
   switch (message.content) {
@@ -95,7 +102,7 @@ client.on(Events.MessageCreate, async (message) => {
       break;
 
     // 取影片
-    case prefix + "vd":
+    case prefix + "vd": {
       if (videos.length === 0) {
         message.channel.send("最新影片皆已發送！");
         return false;
@@ -119,11 +126,39 @@ client.on(Events.MessageCreate, async (message) => {
         message.channel.send(links.join("\n"));
       }
       break;
+    }
 
-    // 抓清單
-    case prefix + "ls":
+    // 取直播
+    case prefix + "st": {
+      if (streams.length === 0) {
+        message.channel.send("最新影片皆已發送！");
+        return false;
+      }
+
+      // 每次發送5個
+      let links = [];
+      for (let i = 0; i < streams.length; i++) {
+        if (links.includes(streams[i].link)) continue;
+
+        links.push(streams[i].link);
+
+        if (links.length === 5) {
+          message.channel.send(links.join("\n"));
+          links = []; // 清空
+        }
+      }
+
+      // 發送剩餘的
+      if (links.length > 0) {
+        message.channel.send(links.join("\n"));
+      }
+      break;
+    }
+
+    // 取影片channelId清單
+    case prefix + "vd ls": {
       let sendStr = "";
-      channels.forEach(function (item) {
+      videosChannels.forEach(function (item) {
         if (item.last_updated == '') {
           item.last_updated = '無';
         }
@@ -133,44 +168,101 @@ client.on(Events.MessageCreate, async (message) => {
 
       message.channel.send(sendStr);
       break;
+    }
+
+    // 取直播channelId清單
+    case prefix + "st ls": {
+      let sendStr = "";
+      streamsChannels.forEach(function (item) {
+        if (item.last_updated == '') {
+          item.last_updated = '無';
+        }
+
+        sendStr += `${item.channelId} - ${item.last_updated}\n`;
+      });
+
+      message.channel.send(sendStr);
+      break;
+    }
   }
 
-  // 新增清單
-  if (message.content.startsWith(prefix + "add")) {
-    let channelID = message.content.split(" ")[1];
+  // 影片新增清單
+  if (message.content.startsWith(prefix + "vd add")) {
+    let channelID = message.content.split(" ")[2];
     if (channelID === undefined || channelID === null || channelID === "") {
       message.channel.send("請輸入頻道ID！");
       return;
     }
     
     // 檢查是否已存在
-    if (channels.some((item) => item.channelId === channelID)) {
+    if (videosChannels.some((item) => item.channelId === channelID)) {
       message.channel.send("此頻道已存在！");
       return;
     }
 
-    channels.push({
+    videosChannels.push({
       channelId: channelID,
       last_updated: "",
     });
 
-    fs.writeFile("channels.json", JSON.stringify({data: channels}), (err) => {
+    fs.writeFile("videosChannels.json", JSON.stringify({data: videosChannels}), (err) => {
       if (err) throw err;
       message.channel.send("新增成功！");
     });
   }
 
-  // 刪除清單
-  if (message.content.startsWith(prefix + "del")) {
-    let channelID = message.content.split(" ")[1];
+  // 直播新增清單
+  if (message.content.startsWith(prefix + "st add")) {
+    let channelID = message.content.split(" ")[2];
+    if (channelID === undefined || channelID === null || channelID === "") {
+      message.channel.send("請輸入頻道ID！");
+      return;
+    }
+    
+    // 檢查是否已存在
+    if (streamsChannels.some((item) => item.channelId === channelID)) {
+      message.channel.send("此頻道已存在！");
+      return;
+    }
+
+    streamsChannels.push({
+      channelId: channelID,
+      last_updated: "",
+    });
+
+    fs.writeFile("streamsChannels.json", JSON.stringify({data: streamsChannels}), (err) => {
+      if (err) throw err;
+      message.channel.send("新增成功！");
+    });
+  }
+
+  // 影片刪除清單
+  if (message.content.startsWith(prefix + "vd del")) {
+    let channelID = message.content.split(" ")[2];
     if (channelID === undefined || channelID === null || channelID === "") {
       message.channel.send("請輸入頻道ID！");
       return;
     }
 
-    channels = channels.filter((item) => item.channelId !== channelID);
+    videosChannels = videosChannels.filter((item) => item.channelId !== channelID);
 
-    fs.writeFile("channels.json", JSON.stringify({data: channels}), (err) => {
+    fs.writeFile("videosChannels.json", JSON.stringify({data: videosChannels}), (err) => {
+      if (err) throw err; 
+      message.channel.send("刪除成功！");
+    });
+  }
+
+  // 直播刪除清單
+  if (message.content.startsWith(prefix + "vd del")) {
+    let channelID = message.content.split(" ")[2];
+    if (channelID === undefined || channelID === null || channelID === "") {
+      message.channel.send("請輸入頻道ID！");
+      return;
+    }
+
+    streamsChannels = streamsChannels.filter((item) => item.channelId !== channelID);
+
+    fs.writeFile("streamsChannels.json", JSON.stringify({data: streamsChannels}), (err) => {
       if (err) throw err; 
       message.channel.send("刪除成功！");
     });
@@ -178,7 +270,7 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 // 自動發送
-client.on(Events.ClientReady, async (c) => {
+client.on(Events.ClientReady, async (c) => { 
   // 计算距离下一个整点或半点的时间
   const now = new Date();
   const minutes = now.getMinutes();
@@ -235,33 +327,14 @@ client.on(Events.ClientReady, async (c) => {
 
   await startTimer();
 
-  // setTimeout(async() => {
-  //   // 午夜12點則不執行
-  //   if (new Date().getHours() !== 0 || new Date().getMinutes() !== 0) {
-  //     // 第一次執行
-  //     await execute();
-  //   }
-
-  //   // 每半小時執行一次
-  //   setInterval(async () => {
-  //     let executeHour = new Date().getHours();
-  //     let executeMinute = new Date().getMinutes();
-
-  //     // 午夜12點則不執行
-  //     if (executeHour === 0 && executeMinute === 0) return;
-  //     await execute();
-
-  //   }, 30 * 60 * 1000 - diff);
-  // }, timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour);
-
   // 每天午夜11點59分59秒執行一次(確保資料有獲取)
-  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  const timeToTarget = target.getTime() - now.getTime();
-  setTimeout(() => {
-    setInterval(async () => {
-      await execute();
-    }, 24 * 60 * 60 * 1000);
-  }, timeToTarget);
+  // const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  // const timeToTarget = target.getTime() - now.getTime();
+  // setTimeout(() => {
+  //   setInterval(async () => {
+  //     await execute();
+  //   }, 24 * 60 * 60 * 1000);
+  // }, timeToTarget);
 
   async function execute() {
     try {
@@ -271,62 +344,73 @@ client.on(Events.ClientReady, async (c) => {
       await delay(300);
 
       // 獲取發送清單
-      fs.readFile('./videos.json', 'utf8', (err, data) => {
-        if (err) throw err;
-        let videos;
-
-        if (data === undefined || data === null || data === "") {
-          videos = [];
-        }
-        else {
-          videos = JSON.parse(data);
-        }
-
-        if (videos.length === 0) {
-          console.log('最新影片皆已發送！');
-          return false;
-        }
-
-        // 一次發送
-        let links = [];
-        for (let i = 0; i < videos.length; i++) {
-          if (links.includes(videos[i].link)) continue;
-
-          links.push(videos[i].link);
-
-          // 每次發送5個
-          if (links.length === 5) {
-            c.channels.cache
-            .get(channelId)
-            .send(links.join("\n"));
-
-            links = []; // 清空
-          }
-        }
-
-        // 發送剩餘的
-        if (links.length > 0) {
-          c.channels.cache
-          .get(channelId)
-          .send(links.join("\n"));
-        }
-      });
+      sendMessage(c, videoChannelId, 'videos.json');
+      sendMessage(c, streamChannelId, 'streams.json');
 
     } catch (error) {
       console.log(error);
-
-      await c.channels.cache
-      .get(channelId)
-      .send('影片抓取失敗！')
-      // .send(error.message)
+      sendMessage(c, videoChannelId, '', '影片抓取失敗！');
+      sendMessage(c, streamChannelId, '', '直播抓取失敗！');
     }
   }
 });
 
+function sendMessage(c, channelId, file = '', message = '') {
+  // 發送檔案資料
+  if (file != '') {
+    fs.readFile(file, 'utf8', (err, data) => {
+      if (err) throw err;
+      let videos;
+  
+      if (data === undefined || data === null || data === "") {
+        videos = [];
+      }
+      else {
+        videos = JSON.parse(data);
+      }
+  
+      if (videos.length === 0) {
+        console.log('最新影片皆已發送！-' + new Date().toLocaleString());
+        return false;
+      }
+  
+      // 一次發送
+      let links = [];
+      for (let i = 0; i < videos.length; i++) {
+        if (links.includes(videos[i].link)) continue;
+  
+        links.push(videos[i].link);
+  
+        // 每次發送5個
+        if (links.length === 5) {
+          c.channels.cache
+          .get(channelId)
+          .send(links.join("\n"));
+  
+          links = []; // 清空
+        }
+      }
+  
+      // 發送剩餘的
+      if (links.length > 0) {
+        c.channels.cache
+        .get(channelId)
+        .send(links.join("\n"));
+      }
+    });
+  }
+
+  // 發送訊息
+  if (message != '') {
+    c.channels.cache
+    .get(channelId)
+    .send(message);
+  }
+}
+
 async function delay(time) {
   await new Promise((resolve) => setTimeout(resolve, time));
 }
-
 
 // When the client is ready, run this code (only once)
 // We use 'c' for the event parameter to keep it separate from the already defined 'client'

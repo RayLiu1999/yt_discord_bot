@@ -1,4 +1,4 @@
-# YT Video Crawler, Discord Robot Push Broadcast (Auto/Manual)
+# YT Video,Stream Crawler, Discord Robot Push Broadcast (Auto/Manual)
 
 ## How to install
 
@@ -20,8 +20,16 @@ After running app.js, it will automatically grab the "current day" video of the 
 
 ## Discord Channel Commands
 
-- `!ls`: get channel list
-- `!add @[channel name]`: add channel list
-- `!del @[channel name]`: delete channel list
+### Video commands
+- `!vd ls`: get channel list
+- `!vd add @[channel name]`: add channel list
+- `!vd del @[channel name]`: delete channel list
 - `!clr`: crawler and save videos
 - `!vd`: get videos
+
+### Strem commands
+- `!st ls`: get channel list
+- `!st add @[channel name]`: add channel list
+- `!st del @[channel name]`: delete channel list
+- `!clr`: crawler and save videos
+- `!st`: get streams

@@ -1,7 +1,10 @@
 node_modules
-channels.json
+videosChannels.json
+streamsChannels.json
 sendedVideos.json
+sendedStreams.json
 videos.json
+streams.json
 lastTime.json
 *.txt
 .env
