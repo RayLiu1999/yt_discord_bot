@@ -8,3 +8,4 @@ streams.json
 lastTime.json
 *.txt
 .env
+error.log

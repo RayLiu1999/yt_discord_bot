@@ -1,4 +1,5 @@
-const { SlashCommandBuilder } = require('discord.js');
+// 使用ES Module的import語法替代require
+import { SlashCommandBuilder } from 'discord.js';
 
 module.exports = {
 	data: new SlashCommandBuilder()

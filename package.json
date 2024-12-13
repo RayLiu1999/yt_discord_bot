@@ -2,8 +2,11 @@
   "name": "yt_discord_bot",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "type": "module",
+  "main": "app.mjs",
   "scripts": {
+    "start": "node app.mjs",
+    "dev": "node app.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -11,6 +14,8 @@
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "discord.js": "^14.11.0",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^23.10.4"
   }
 }
