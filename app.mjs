@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import dotenv from 'dotenv';
 import {
   delay,
   readFile,
@@ -8,12 +7,8 @@ import {
   addErrorLog,
 } from "./src/functions.mjs";
 import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
-
-dotenv.config();
-
-const TOKEN = process.env.TOKEN;
-const VIDEO_CHANNEL_ID = process.env.VIDEO_CHANNEL_ID;
-const STREAM_CHANNEL_ID = process.env.STREAM_CHANNEL_ID;
+import crawler from './src/crawler.mjs'
+import config from "./src/config.mjs";
 
 // 建立 Discord 客戶端實例
 const client = new Client({
@@ -91,10 +86,8 @@ client.on(Events.MessageCreate, async (message) => {
   switch (message.content) {
     // 爬影片
     case prefix + 'clr':
-      const execute = (await import('./src/crawler.mjs')).default;
-
       try {
-        await execute();
+        await crawler(client);
         message.channel.send('影片抓取成功！');
       } catch (error) {
         console.log(error);
@@ -280,8 +273,6 @@ client.on(Events.ClientReady, async (interaction) => {
   const timeToNextHalfHour = (30 - minutes % 30) * 60 * 1000 - seconds * 1000 - milliseconds;
   const timeToNextHour = (60 - minutes) * 60 * 1000 - seconds * 1000 - milliseconds;
 
-  const crawler = (await import('./src/crawler.mjs')).default;
-
   let intervalTime = timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour
   async function startTimer() {
     console.log('啟動時間：' + new Date().toLocaleString());
@@ -297,7 +288,7 @@ client.on(Events.ClientReady, async (interaction) => {
 
       // 午夜12點則不執行
       if (executeHour !== 0 || executeMinute !== 0) {
-        await execute();
+        await execute(client);
         console.log('結束抓取時間：' + new Date().toLocaleString());
       }
 
@@ -339,17 +330,17 @@ client.on(Events.ClientReady, async (interaction) => {
   async function execute() {
     try {
       // 執行爬蟲
-      await crawler();
+      await crawler(client);
 
       await delay(300);
 
       // 獲取發送清單
-      sendVideo('videos.json', VIDEO_CHANNEL_ID);
-      sendVideo('streams.json', STREAM_CHANNEL_ID);
+      sendVideo('videos.json', config.VIDEO_CHANNEL_ID);
+      sendVideo('streams.json', config.STREAM_CHANNEL_ID);
     } catch (error) {
       addErrorLog(error);
-      sendMessage(interaction, VIDEO_CHANNEL_ID, '影片抓取失敗！');
-      sendMessage(interaction, STREAM_CHANNEL_ID, '直播抓取失敗！');
+      await sendMessage(interaction, config.VIDEO_CHANNEL_ID, '影片抓取失敗！');
+      await sendMessage(interaction, config.STREAM_CHANNEL_ID, '直播抓取失敗！');
     }
   }
 });
@@ -364,7 +355,7 @@ async function sendVideo(file, channelId) {
   }
 
   // 一次發送
-  const links = [];
+  let links = [];
   for (let i = 0; i < videos.length; i++) {
     if (links.includes(videos[i].link)) continue;
 
@@ -372,7 +363,7 @@ async function sendVideo(file, channelId) {
 
     // 每次發送5個
     if (links.length === 5) {
-      sendMessage(client, channelId, links.join("\n"));
+      await sendMessage(client, channelId, links.join("\n"));
 
       links = []; // 清空
     }
@@ -380,7 +371,7 @@ async function sendVideo(file, channelId) {
 
   // 發送剩餘的
   if (links.length > 0) {
-    sendMessage(client, channelId, links.join("\n"));
+    await sendMessage(client, channelId, links.join("\n"));
   }
 }
 
@@ -391,4 +382,4 @@ client.once(Events.ClientReady, (c) => {
 });
 
 // 使用 Discord 客戶端 token 登入
-client.login(TOKEN);
+client.login(config.TOKEN);

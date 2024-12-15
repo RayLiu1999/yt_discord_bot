@@ -44,10 +44,9 @@ function checkTime(time) {
 }
 
 // 讀取檔案
-async function readFile(file) {
+function readFile(file) {
+  // 檢查檔案是否存在
   if (!fs.existsSync(file)) {
-    // 建立檔案
-    writeFile(file, "[]");
     return [];
   }
 
@@ -84,26 +83,17 @@ function checkIsSended(sendedVideos, videoId) {
 }
 
 // 發送訊息
-async function sendMessage(client, channelId, message = "") {
+async function sendMessage(client, channelId, message) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) {
     addErrorLog("找不到頻道");
     return;
   }
   try {
-    await channel.send(msg);
+    await channel.send(message);
     console.log("訊息已發送！-" + new Date().toLocaleString());
   } catch (error) {
     addErrorLog("訊息發送失敗：", error)
-  }
-
-  // 發送檔案資料
-  if (file != "") {
-  }
-
-  // 發送訊息
-  if (message != "") {
-    client.channels.cache.get(channelId).send(message);
   }
 }
 
@@ -111,12 +101,31 @@ async function sendMessage(client, channelId, message = "") {
 function addErrorLog(error) {
   console.error(error);
 
-  const now = new Date();
-  const log = `${now.toLocaleString()} - ${error}\n`;
+  // const now = new Date();
+  // const log = `${now.toLocaleString()} - ${error}\n`;
 
-  fs.appendFile("error.log", log, (err) => {
-    if (err) throw err;
-  });
+  // fs.appendFile("error.log", log, (err) => {
+  //   if (err) throw err;
+  // });
+}
+
+// 移除Youtube頻道
+function removeYTChannel(type, YTchannelID) {
+  let file = "";
+  switch (type) {
+    case "videos":
+      file = "videosChannels.json";
+      break;
+    case "steams":
+      file = "streamsChannels.json";
+      break;
+  }
+
+  const channels = readFile(file);
+  const newChannels = channels.data.filter((channel) => channel.channelId !== YTchannelID);
+  console.log({data: newChannels});
+  writeFile(file, JSON.stringify({data: newChannels}));
+  console.log("已移除頻道：" + YTchannelID);
 }
 
 export {
@@ -127,4 +136,5 @@ export {
   checkIsSended,
   sendMessage,
   addErrorLog,
+  removeYTChannel
 };

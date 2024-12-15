@@ -8,43 +8,57 @@ import {
   readFile,
   writeFile,
   addErrorLog,
+  sendMessage,
+  removeYTChannel,
 } from "./functions.mjs";
+import config from "./config.mjs";
 
 const YT_domain = "https://www.youtube.com";
 const type = ["videos", "streams", "community"];
-const crawlerType = process.env.CRAWLER_TYPE || "fetch";
+let DCclient;
 
-async function execute() {
+async function execute(client) {
+  DCclient = client;
+
   // 讀取頻道清單
-  let videosChannels = readFile("./videosChannels.json").data;
-  let streamsChannels = readFile("./streamsChannels.json").data;
+  let videosChannels = readFile("videosChannels.json").data || [];
+  let streamsChannels = readFile("streamsChannels.json").data || [];
+
+  if (videosChannels.length === 0) {
+    await sendMessage(client, config.VIDEO_CHANNEL_ID, "影片頻道清單為空");
+    return;
+  }
+
+  if (streamsChannels.length === 0) {
+    await sendMessage(client, config.STREAM_CHANNEL_ID, "直播頻道清單為空");
+  }
 
   // 判斷是否為新的一天
-  const lastTime = readFile("./lastTime.json");
+  const lastTime = readFile("lastTime.json");
 
   const now = new Date();
   const last = new Date(lastTime.time);
 
   // 新的一天則清空已發送清單
   if (now.getDate() !== last.getDate()) {
-    writeFile("./sendedVideos.json", JSON.stringify([]));
-    writeFile("./sendedStreams.json", JSON.stringify([]));
+    writeFile("sendedVideos.json", JSON.stringify([]));
+    writeFile("sendedStreams.json", JSON.stringify([]));
   }
 
   // 更改最後更新時間
   lastTime.time = new Date().getTime();
-  writeFile("./lastTime.json", JSON.stringify(lastTime));
+  writeFile("lastTime.json", JSON.stringify(lastTime));
 
-  const sendedVideos = readFile("./sendedVideos.json");
-  const sendedStreams = readFile("./sendedStreams.json");
+  const sendedVideos = readFile("sendedVideos.json") || [];
+  const sendedStreams = readFile("sendedStreams.json") || [];
 
   let videosInfo = [];
   let streamsInfo = [];
   let batchPromises = [];
 
   videosChannels.forEach((item) => {
-    let url = YT_domain + "/" + item.channelId + "/";
-    switch (crawlerType) {
+    const url = YT_domain + "/" + item.channelId + "/";
+    switch (config.CRAWLER_TYPE) {
       case "puppeteer":
         batchPromises.push(puppeteerCrawler(url, item.channelId));
         break;
@@ -57,8 +71,8 @@ async function execute() {
   });
 
   streamsChannels.forEach((item) => {
-    let url = YT_domain + "/" + item.channelId + "/";
-    switch (crawlerType) {
+    const url = YT_domain + "/" + item.channelId + "/";
+    switch (config.CRAWLER_TYPE) {
       case "puppeteer":
         batchPromises.push(puppeteerCrawler(url, item.channelId));
         break;
@@ -70,16 +84,19 @@ async function execute() {
     }
   });
 
+  // 處理所有Promise
   await Promise.all(batchPromises).then(() => {
     // 寫入發送清單
-    writeFile("./videos.json", JSON.stringify(videosInfo));
-    writeFile("./streams.json", JSON.stringify(streamsInfo));
+    writeFile("videos.json", JSON.stringify(videosInfo));
+    writeFile("streams.json", JSON.stringify(streamsInfo));
 
-    // region 更新烤肉man時間
+    // #region 更新YT頻道更新時間
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
     const day = now.getDate();
+
+    videosChannels = readFile("videosChannels.json").data || []; // 重撈清單
     videosInfo.forEach(function (item1) {
       videosChannels.forEach(function (item2) {
         if (item1.channelId == item2.channelId) {
@@ -88,6 +105,7 @@ async function execute() {
       });
     });
 
+    streamsChannels = readFile("streamsChannels.json").data || []; // 重撈清單
     streamsInfo.forEach(function (item1) {
       streamsChannels.forEach(function (item2) {
         if (item1.channelId == item2.channelId) {
@@ -97,19 +115,20 @@ async function execute() {
     });
 
     writeFile(
-      "./videosChannels.json",
+      "videosChannels.json",
       JSON.stringify({ data: videosChannels })
     );
+
     writeFile(
-      "./streamsChannels.json",
+      "streamsChannels.json",
       JSON.stringify({ data: streamsChannels })
     );
-    // endregion
+    // #endregion
 
     // 寫入已發送清單
     if (videosInfo.length > 0) {
       writeFile(
-        "./sendedVideos.json",
+        "sendedVideos.json",
         JSON.stringify(sendedVideos.concat(videosInfo))
       );
       console.log("本日影片已儲存！");
@@ -117,7 +136,7 @@ async function execute() {
 
     if (streamsInfo.length > 0) {
       writeFile(
-        "./sendedStreams.json",
+        "sendedStreams.json",
         JSON.stringify(sendedStreams.concat(streamsInfo))
       );
       console.log("本日直播已儲存！");
@@ -126,21 +145,20 @@ async function execute() {
 }
 
 async function fetchCrawler(url, type, videosInfo, sendedVideos) {
-  url = `${url}${type}`;
+  const fetchUrl = `${url}${type}`;
 
-  return fetch(url, {
+  return fetch(fetchUrl, {
     method: "GET",
   })
-    .then((response) => {
+    .then(async (response) => {
       if (response.ok) {
         return response.text();
       } else {
-        // 印出網址、狀態碼、錯誤訊息
-        addErrorLog(`網址: ${url}，狀態碼: ${response.status}，錯誤訊息: ${response.statusText}`);
-
         // 網址為404則移除該頻道
         if (response.status == 404) {
-          addErrorLog(`移除頻道: ${url}`);
+          const YTchannelID = new URL(url).pathname.replaceAll('/', '');
+          removeYTChannel(type, YTchannelID);
+          await sendMessage(DCclient, config.VIDEO_CHANNEL_ID, `移除頻道: ${fetchUrl}`);
           return;
         }
       }
@@ -181,7 +199,7 @@ async function fetchCrawler(url, type, videosInfo, sendedVideos) {
           const videoJson = item.richItemRenderer.content.videoRenderer;
           const videoId = videoJson.videoId;
           const videoTitle = videoJson.title.runs[0].text;
-          const videoThumbnail = videoJson.thumbnail.thumbnails[0].url;
+          const videoThumbnail = videoJson.thumbnail.thumbnails[0].fetchUrl;
           const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
           const peopleObj = videoJson.viewCountText; // 人數資料暫存
 
@@ -253,123 +271,124 @@ async function fetchCrawler(url, type, videosInfo, sendedVideos) {
     .catch((error) => addErrorLog(error));
 }
 
-function puppeteerCrawler(url, channel, sendedVideos, videosInfo) {
-  return new Promise(async (resolve, reject) => {
-    let browser = await puppeteer.launch({ headless: true });
-    let page = await browser.newPage();
+// 棄用
+// function puppeteerCrawler(url, channel, sendedVideos, videosInfo) {
+//   return new Promise(async (resolve, reject) => {
+//     let browser = await puppeteer.launch({ headless: true });
+//     let page = await browser.newPage();
 
-    await delay(500);
+//     await delay(500);
 
-    await page.setDefaultNavigationTimeout(30000);
-    let res = await page.goto(url);
+//     await page.setDefaultNavigationTimeout(30000);
+//     let res = await page.goto(url);
 
-    if (!res.ok()) {
-      throw new Error(`${channel}找不到頻道`);
-    }
+//     if (!res.ok()) {
+//       throw new Error(`${channel}找不到頻道`);
+//     }
 
-    // wait for page loading
-    await delay(300);
+//     // wait for page loading
+//     await delay(300);
 
-    // get channel title
-    let channelTitleHandle = await page.$("#text-container");
+//     // get channel title
+//     let channelTitleHandle = await page.$("#text-container");
 
-    // fet channel id
-    let channelIdHandle = await page.$("#channel-handle");
+//     // fet channel id
+//     let channelIdHandle = await page.$("#channel-handle");
 
-    // wait for page loading
-    await delay(300);
+//     // wait for page loading
+//     await delay(300);
 
-    if (channelTitleHandle === null || channelTitleHandle === undefined) {
-      throw new Error(`${channel}頻道找不到標題`);
-    }
+//     if (channelTitleHandle === null || channelTitleHandle === undefined) {
+//       throw new Error(`${channel}頻道找不到標題`);
+//     }
 
-    let channelTitle = await channelTitleHandle.evaluate(
-      (el) => el.textContent
-    );
+//     let channelTitle = await channelTitleHandle.evaluate(
+//       (el) => el.textContent
+//     );
 
-    let channelId = await channelIdHandle.evaluate((el) => el.textContent);
+//     let channelId = await channelIdHandle.evaluate((el) => el.textContent);
 
-    let elementHandle = await page.$("#contents:first-child");
+//     let elementHandle = await page.$("#contents:first-child");
 
-    // wait for page loading
-    await delay(300);
+//     // wait for page loading
+//     await delay(300);
 
-    if (elementHandle === null || elementHandle === undefined) {
-      throw new Error("找不到影片");
-    }
+//     if (elementHandle === null || elementHandle === undefined) {
+//       throw new Error("找不到影片");
+//     }
 
-    let element = await elementHandle.asElement();
+//     let element = await elementHandle.asElement();
 
-    // wait for page loading
-    await delay(300);
+//     // wait for page loading
+//     await delay(300);
 
-    let videos = await page.evaluate(
-      (element, channelTitle, sendedVideos, channelId) => {
-        let videos = element.querySelectorAll(".style-scope.ytd-rich-grid-row");
-        let info = [];
+//     let videos = await page.evaluate(
+//       (element, channelTitle, sendedVideos, channelId) => {
+//         let videos = element.querySelectorAll(".style-scope.ytd-rich-grid-row");
+//         let info = [];
 
-        for (let video of videos) {
-          let metadataLine = video.querySelector("#metadata-line");
+//         for (let video of videos) {
+//           let metadataLine = video.querySelector("#metadata-line");
 
-          if (metadataLine === null || metadataLine === undefined) {
-            continue;
-          }
+//           if (metadataLine === null || metadataLine === undefined) {
+//             continue;
+//           }
 
-          let domInfo = metadataLine.textContent
-            .replace(/\n|\s/g, "")
-            .split("次");
-          let views = domInfo[1].split("：")[1];
-          let time = domInfo[2];
+//           let domInfo = metadataLine.textContent
+//             .replace(/\n|\s/g, "")
+//             .split("次");
+//           let views = domInfo[1].split("：")[1];
+//           let time = domInfo[2];
 
-          // 判斷是否已發送過
-          if (sendedVideos.length > 0) {
-            let isSended = false;
-            for (let sendedVideo of sendedVideos) {
-              if (
-                sendedVideo.title ==
-                video.querySelector("#video-title").textContent
-              ) {
-                isSended = true;
-                continue;
-              }
-            }
+//           // 判斷是否已發送過
+//           if (sendedVideos.length > 0) {
+//             let isSended = false;
+//             for (let sendedVideo of sendedVideos) {
+//               if (
+//                 sendedVideo.title ==
+//                 video.querySelector("#video-title").textContent
+//               ) {
+//                 isSended = true;
+//                 continue;
+//               }
+//             }
 
-            if (isSended) {
-              continue;
-            }
-          }
+//             if (isSended) {
+//               continue;
+//             }
+//           }
 
-          if (!checkTime(videoPublishedTime)) continue; // 判斷影片是否今天發佈，不是則跳過
+//           if (!checkTime(videoPublishedTime)) continue; // 判斷影片是否今天發佈，不是則跳過
 
-          // 加入清單
-          info.push({
-            title: video.querySelector("#video-title").textContent,
-            link: video.querySelector("#video-title-link").href,
-            pic: video.querySelector("yt-image img").src,
-            time: video
-              .querySelector("#overlays")
-              .textContent.replace(/\n|\s/g, ""),
-            views: views,
-            date: time,
-            channel: channelTitle.replace(/\n|\s/g, ""),
-            channelId: channelId,
-          });
-        }
-        return info;
-      },
-      element,
-      channelTitle,
-      sendedVideos,
-      channelId
-    );
+//           // 加入清單
+//           info.push({
+//             title: video.querySelector("#video-title").textContent,
+//             link: video.querySelector("#video-title-link").href,
+//             pic: video.querySelector("yt-image img").src,
+//             time: video
+//               .querySelector("#overlays")
+//               .textContent.replace(/\n|\s/g, ""),
+//             views: views,
+//             date: time,
+//             channel: channelTitle.replace(/\n|\s/g, ""),
+//             channelId: channelId,
+//           });
+//         }
+//         return info;
+//       },
+//       element,
+//       channelTitle,
+//       sendedVideos,
+//       channelId
+//     );
 
-    videosInfo.push(...videos);
+//     videosInfo.push(...videos);
 
-    await browser.close();
+//     await browser.close();
 
-    resolve();
-  });
-}
+//     resolve();
+//   });
+// }
 
 // 匯出 execute 函數
 export default execute;

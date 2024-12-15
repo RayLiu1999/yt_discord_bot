@@ -6,7 +6,7 @@
   "main": "app.mjs",
   "scripts": {
     "start": "node app.mjs",
-    "dev": "node app.mjs",
+    "dev": "nodemon app.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
