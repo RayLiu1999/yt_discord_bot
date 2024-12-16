@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
+
 import {
   delay,
   readFile,
   sendMessage,
   addErrorLog,
-} from "./src/functions.mjs";
-import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
-import crawler from './src/crawler.mjs'
-import config from "./src/config.mjs";
+} from "#src/functions";
+import crawler from '#src/crawler';
+import config from '#src/config';
+import { rootDir } from "#src/path";
 
 // 建立 Discord 客戶端實例
 const client = new Client({
@@ -77,10 +79,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.on(Events.MessageCreate, async (message) => {
   const prefix = '!';
   // 讀取頻道列表和影片資料
-  const videosChannels = readFile('./videosChannels.json').data || [];
-  const streamsChannels = readFile('./streamsChannels.json').data || [];
-  const videos = readFile('./videos.json') || [];
-  const streams = readFile('./streams.json') || [];
+  const videosChannels = readFile(`${rootDir}/videosChannels.json`).data || [];
+  const streamsChannels = readFile(`${rootDir}/streamsChannels.json`).data || [];
+  const videos = readFile(`${rootDir}/videos.json`) || [];
+  const streams = readFile(`${rootDir}/streams.json`) || [];
 
   // 取影片連結
   switch (message.content) {
@@ -88,7 +90,6 @@ client.on(Events.MessageCreate, async (message) => {
     case prefix + 'clr':
       try {
         await crawler(client);
-        message.channel.send('影片抓取成功！');
       } catch (error) {
         console.log(error);
         await message.reply('影片抓取失敗！');
@@ -212,7 +213,7 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel.send('請輸入頻道ID！');
       return;
     }
-    
+
     // 檢查是否已存在
     if (streamsChannels.some((item) => item.channelId === channelID)) {
       message.channel.send('此頻道已存在！');
@@ -241,7 +242,7 @@ client.on(Events.MessageCreate, async (message) => {
     videosChannels = videosChannels.filter((item) => item.channelId !== channelID);
 
     fs.writeFile('videosChannels.json', JSON.stringify({data: videosChannels}), (err) => {
-      if (err) throw err; 
+      if (err) throw err;
       message.channel.send('刪除成功！');
     });
   }
@@ -257,7 +258,7 @@ client.on(Events.MessageCreate, async (message) => {
     streamsChannels = streamsChannels.filter((item) => item.channelId !== channelID);
 
     fs.writeFile('streamsChannels.json', JSON.stringify({data: streamsChannels}), (err) => {
-      if (err) throw err; 
+      if (err) throw err;
       message.channel.send('刪除成功！');
     });
   }
