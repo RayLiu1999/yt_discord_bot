@@ -73,9 +73,9 @@ function writeFile(file, data) {
 }
 
 // 檢查是否已發送過
-function checkIsSended(sendedVideos, videoId) {
-  for (let sendedVideo of sendedVideos) {
-    if (sendedVideo.id == videoId) {
+function checkIsSended(sendedVideosOrStreams, videoId) {
+  for (let sendedVideosOrStream of sendedVideosOrStreams) {
+    if (sendedVideosOrStream.id == videoId) {
       return true;
     }
   }
