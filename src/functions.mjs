@@ -98,6 +98,36 @@ async function sendMessage(client, channelId, message) {
   }
 }
 
+// 發送影片
+async function sendVideo(client, file, channelId) {
+  const videos = await readFile(file);
+
+  if (videos.length === 0) {
+    console.log("最新影片皆已發送！-" + new Date().toLocaleString());
+    return false;
+  }
+
+  // 一次發送
+  let links = [];
+  for (let i = 0; i < videos.length; i++) {
+    if (links.includes(videos[i].link)) continue;
+
+    links.push(videos[i].link);
+
+    // 每次發送5個
+    if (links.length === 5) {
+      await sendMessage(client, channelId, links.join("\n"));
+
+      links = []; // 清空
+    }
+  }
+
+  // 發送剩餘的
+  if (links.length > 0) {
+    await sendMessage(client, channelId, links.join("\n"));
+  }
+}
+
 // 新增錯誤log
 function addErrorLog(error) {
   console.error(error);
@@ -135,6 +165,7 @@ export {
   writeFile,
   checkIsSended,
   sendMessage,
+  sendVideo,
   addErrorLog,
   removeYTChannel
 };
