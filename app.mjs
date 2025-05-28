@@ -92,10 +92,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.on(Events.MessageCreate, async (message) => {
   const PREFIX = "!";
   // 讀取頻道列表和影片資料
-  const videosChannels = readFile(`${rootDir}/videosChannels.json`).data || [];
-  const streamsChannels = readFile(`${rootDir}/streamsChannels.json`).data || [];
-  const videos = readFile(`${rootDir}/videos.json`) || [];
-  const streams = readFile(`${rootDir}/streams.json`) || [];
+  let videosChannels = readFile(`${rootDir}/videosChannels.json`).data || [];
+  let streamsChannels = readFile(`${rootDir}/streamsChannels.json`).data || [];
+  let videos = readFile(`${rootDir}/videos.json`) || [];
+  let streams = readFile(`${rootDir}/streams.json`) || [];
 
   // 取影片連結
   switch (message.content) {
