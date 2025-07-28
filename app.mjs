@@ -275,7 +275,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // 直播刪除清單
-  if (message.content.startsWith(PREFIX + "vd del")) {
+  if (message.content.startsWith(PREFIX + "st del")) {
     let channelID = message.content.split(" ")[2];
     if (channelID === undefined || channelID === null || channelID === "") {
       message.channel.send("請輸入頻道ID！");
@@ -539,11 +539,13 @@ function playMusic(connection, player, audioStream) {
 }
 
 // 取得影片標題
+// 取得 YouTube 影片標題
 function getYTTitle(url) {
   return new Promise((resolve, reject) => {
     exec(`yt-dlp -j ${url}`, (error, stdout, stderr) => {
       if (error) {
-        console.error(`Error: ${err.message}`);
+        console.error(`Error: ${error.message}`);
+        reject(error);
         return;
       }
 
