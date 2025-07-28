@@ -213,3 +213,6 @@ export {
   sendVideo,
   removeYTChannel
 };
+
+// 向後兼容的別名
+export { readFileSync as readFile };
