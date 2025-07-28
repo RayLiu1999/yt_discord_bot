@@ -1,11 +1,63 @@
-node_modules
+# 環境變數檔案
+.env
+.env.local
+.env.development
+.env.production
+
+# 依賴項目
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 運行時生成的檔案
+*.log
+logs/
+output.mp4
+output.mp3
+
+# JSON 資料檔案
 videosChannels.json
 streamsChannels.json
-sendedVideos.json
-sendedStreams.json
 videos.json
 streams.json
+sendedVideos.json
+sendedStreams.json
 lastTime.json
+
+# PM2 相關檔案
+.pm2/
+ecosystem.config.js
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 臨時檔案
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 測試覆蓋率報告
+coverage/
+.nyc_output/
+
+# 建構輸出
+dist/
+build/
+
+# 除錯檔案
+*.debug
+
+# 備份檔案
+*_old.*
+*.backup
+
+# 文字檔案
 *.txt
-.env
+
+# 舊的錯誤日誌
 error.log

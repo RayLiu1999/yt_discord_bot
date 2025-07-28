@@ -204,7 +204,7 @@ async function removeYTChannel(type, YTchannelID) {
 export {
   delay,
   checkTime,
-  readFile,
+  readFileSync as readFile, // 主要導出，向後兼容
   readFileSync,
   writeFile,
   writeFileSync,
@@ -213,6 +213,3 @@ export {
   sendVideo,
   removeYTChannel
 };
-
-// 向後兼容的別名
-export { readFileSync as readFile };
