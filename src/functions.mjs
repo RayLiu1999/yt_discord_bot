@@ -1,5 +1,8 @@
-import fs from 'fs';
+import fs from 'fs/promises';
+import fsSync from 'fs';
 import { rootDir } from '#src/path';
+import { CONSTANTS } from '#src/constants';
+import { logger, addErrorLog } from '#src/logger';
 
 // 延遲函數
 function delay(time) {
@@ -12,9 +15,6 @@ function checkTime(time) {
   let timeDiff = '';
 
   if (isNaN(time)) {
-    // if (time.includes('天前') || time.includes('day')) {
-    //   return false;
-    // }
     if (time.includes('小時前') || time.includes('hour')) {
       time = time.replace(/[^0-9]/g, '');
       timeDiff = parseInt(time);
@@ -44,128 +44,172 @@ function checkTime(time) {
   return true;
 }
 
-// 讀取檔案
-function readFile(file) {
-  // 檢查檔案是否存在
-  if (!fs.existsSync(file)) {
-    return [];
-  }
-
-  let data = fs.readFileSync(file, 'utf8');
-
-  if (!data) {
-    return [];
-  }
-
+// 讀取檔案（異步版本）
+async function readFile(file) {
   try {
+    // 檢查檔案是否存在
+    if (!fsSync.existsSync(file)) {
+      await logger.warn(`檔案不存在: ${file}`);
+      return [];
+    }
+
+    const data = await fs.readFile(file, 'utf8');
+    
+    if (!data) {
+      return [];
+    }
+
     return JSON.parse(data);
   } catch (error) {
-    console.error(error);
+    await logger.error(`讀取檔案失敗: ${file}`, { error: error.message });
     return [];
   }
 }
 
-// 寫入檔案
-function writeFile(file, data) {
-  fs.writeFile(file, data, (err) => {
-    if (err) throw err;
-  });
+// 讀取檔案（同步版本，向後兼容）
+function readFileSync(file) {
+  try {
+    // 檢查檔案是否存在
+    if (!fsSync.existsSync(file)) {
+      return [];
+    }
+
+    const data = fsSync.readFileSync(file, 'utf8');
+
+    if (!data) {
+      return [];
+    }
+
+    return JSON.parse(data);
+  } catch (error) {
+    addErrorLog(error, { file });
+    return [];
+  }
+}
+
+// 寫入檔案（異步版本）
+async function writeFile(file, data) {
+  try {
+    await fs.writeFile(file, data);
+    await logger.debug(`檔案寫入成功: ${file}`);
+  } catch (error) {
+    await logger.error(`檔案寫入失敗: ${file}`, { error: error.message });
+    throw error;
+  }
+}
+
+// 寫入檔案（同步版本，向後兼容）
+function writeFileSync(file, data) {
+  try {
+    fsSync.writeFileSync(file, data);
+  } catch (error) {
+    addErrorLog(error, { file });
+    throw error;
+  }
 }
 
 // 檢查是否已發送過
 function checkIsSended(sendedVideosOrStreams, videoId) {
-  for (let sendedVideosOrStream of sendedVideosOrStreams) {
-    if (sendedVideosOrStream.id == videoId) {
-      return true;
-    }
-  }
-
-  return false;
+  return sendedVideosOrStreams.some(item => item.id === videoId);
 }
 
 // 發送訊息
 async function sendMessage(client, channelId, message) {
-  const channel = client.channels.cache.get(channelId);
-  if (!channel) {
-    addErrorLog('找不到頻道');
-    return;
-  }
   try {
+    const channel = client.channels.cache.get(channelId);
+    if (!channel) {
+      await logger.error(CONSTANTS.ERRORS.CHANNEL_NOT_FOUND, { channelId });
+      return false;
+    }
+    
     await channel.send(message);
-    console.log('訊息已發送！-' + new Date().toLocaleString());
+    await logger.info(`訊息已發送到頻道 ${channelId}: ${message}`);
+    return true;
   } catch (error) {
-    addErrorLog('訊息發送失敗：', error)
-  }
-}
-
-// 發送影片
-async function sendVideo(client, file, channelId) {
-  const videos = await readFile(file);
-
-  if (videos.length === 0) {
-    console.log("最新影片皆已發送！-" + new Date().toLocaleString());
+    await logger.error(`訊息發送失敗`, { 
+      channelId, 
+      message, 
+      error: error.message 
+    });
     return false;
   }
-
-  // 一次發送
-  let links = [];
-  for (let i = 0; i < videos.length; i++) {
-    if (links.includes(videos[i].link)) continue;
-
-    links.push(videos[i].link);
-
-    // 每次發送5個
-    if (links.length === 5) {
-      await sendMessage(client, channelId, links.join("\n"));
-
-      links = []; // 清空
-    }
-  }
-
-  // 發送剩餘的
-  if (links.length > 0) {
-    await sendMessage(client, channelId, links.join("\n"));
-  }
 }
 
-// 新增錯誤log
-function addErrorLog(error) {
-  console.error(error);
+// 發送影片（改進版本）
+async function sendVideo(client, file, channelId) {
+  try {
+    const videos = await readFile(file);
 
-  // const now = new Date();
-  // const log = `${now.toLocaleString()} - ${error}\n`;
+    if (videos.length === 0) {
+      await logger.info("最新影片皆已發送！");
+      return false;
+    }
 
-  // fs.appendFile('error.log', log, (err) => {
-  //   if (err) throw err;
-  // });
+    // 去重和批次發送
+    const uniqueLinks = [...new Set(videos.map(video => video.link))];
+    const batches = [];
+    
+    for (let i = 0; i < uniqueLinks.length; i += CONSTANTS.DISCORD.LINKS_PER_MESSAGE) {
+      batches.push(uniqueLinks.slice(i, i + CONSTANTS.DISCORD.LINKS_PER_MESSAGE));
+    }
+
+    for (const batch of batches) {
+      const success = await sendMessage(client, channelId, batch.join("\n"));
+      if (!success) {
+        break; // 如果發送失敗，停止發送剩餘批次
+      }
+      
+      // 添加延遲避免觸發速率限制
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await delay(CONSTANTS.DISCORD.MESSAGE_DELAY);
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    await logger.error(`發送影片失敗`, { file, channelId, error: error.message });
+    return false;
+  }
 }
 
 // 移除Youtube頻道
-function removeYTChannel(type, YTchannelID) {
-  let file = '';
-  switch (type) {
-    case 'videos':
-      file = `${rootDir}/videosChannels.json`;
-      break;
-    case 'steams':
-      file = `${rootDir}/streamsChannels.json`;
-      break;
-  }
+async function removeYTChannel(type, YTchannelID) {
+  try {
+    let file = '';
+    switch (type) {
+      case 'videos':
+        file = `${rootDir}/${CONSTANTS.FILES.VIDEOS_CHANNELS}`;
+        break;
+      case 'streams':
+        file = `${rootDir}/${CONSTANTS.FILES.STREAMS_CHANNELS}`;
+        break;
+      default:
+        await logger.error(`無效的頻道類型: ${type}`);
+        return false;
+    }
 
-  const channels = readFile(file);
-  const newChannels = channels.data.filter((channel) => channel.channelId !== YTchannelID);
-  writeFile(file, JSON.stringify({data: newChannels}));
-  console.log('已移除頻道：' + YTchannelID);
+    const channels = await readFile(file);
+    const newChannels = channels.data?.filter(channel => channel.channelId !== YTchannelID) || [];
+    
+    await writeFile(file, JSON.stringify({ data: newChannels }));
+    await logger.info(`已移除頻道: ${YTchannelID}`, { type });
+    
+    return true;
+  } catch (error) {
+    await logger.error(`移除頻道失敗`, { type, YTchannelID, error: error.message });
+    return false;
+  }
 }
 
 export {
   delay,
   checkTime,
-  readFile,
+  readFileSync as readFile, // 主要導出，向後兼容
+  readFileSync,
   writeFile,
+  writeFileSync,
   checkIsSended,
   sendMessage,
   sendVideo,
-  addErrorLog,
   removeYTChannel
 };

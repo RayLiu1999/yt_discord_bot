@@ -6,12 +6,13 @@ import {
   checkIsSended,
   checkTime,
   delay,
-  readFile,
-  writeFile,
-  addErrorLog,
+  readFileSync,
+  writeFileSync,
   sendMessage,
   removeYTChannel,
 } from '#src/functions';
+import { logger } from '#src/logger';
+import { CONSTANTS } from '#src/constants';
 import config from '#src/config';
 import { rootDir } from '#src/path';
 
@@ -22,45 +23,45 @@ let DCclient;
 async function execute(client) {
   DCclient = client;
 
-  console.log('開始爬蟲...');
+  await logger.info('開始爬蟲任務');
 
   // 讀取頻道清單
-  let videosChannels = readFile(`${rootDir}/videosChannels.json`).data || [];
-  let streamsChannels = readFile(`${rootDir}/streamsChannels.json`).data || [];
+  let videosChannels = readFileSync(`${rootDir}/${CONSTANTS.FILES.VIDEOS_CHANNELS}`).data || [];
+  let streamsChannels = readFileSync(`${rootDir}/${CONSTANTS.FILES.STREAMS_CHANNELS}`).data || [];
 
   if (videosChannels.length === 0) {
-    await sendMessage(client, config.VIDEO_CHANNEL_ID, '影片頻道清單為空');
+    await sendMessage(client, config.VIDEO_CHANNEL_ID, CONSTANTS.INFO.EMPTY_VIDEOS_CHANNELS);
     return;
   }
 
   if (streamsChannels.length === 0) {
-    await sendMessage(client, config.STREAM_CHANNEL_ID, '直播頻道清單為空');
+    await sendMessage(client, config.STREAM_CHANNEL_ID, CONSTANTS.INFO.EMPTY_STREAMS_CHANNELS);
   }
 
   // 判斷是否為新的一天
-  const lastTime = readFile(`${rootDir}/lastTime.json`);
+  const lastTime = readFileSync(`${rootDir}/${CONSTANTS.FILES.LAST_TIME}`);
 
   const now = new Date();
   const last = new Date(lastTime.time);
 
   // 新的一天則清空已發送清單
   if (now.getDate() !== last.getDate()) {
-    writeFile(`${rootDir}/sendedVideos.json`, JSON.stringify([]));
-    writeFile(`${rootDir}/sendedStreams.json`, JSON.stringify([]));
+    writeFileSync(`${rootDir}/${CONSTANTS.FILES.SENDED_VIDEOS}`, JSON.stringify([]));
+    writeFileSync(`${rootDir}/${CONSTANTS.FILES.SENDED_STREAMS}`, JSON.stringify([]));
+    await logger.info('新的一天，已清空發送記錄');
   }
 
   // 更改最後更新時間
-  writeFile(`${rootDir}/lastTime.json`, JSON.stringify({ time: new Date().getTime() }));
+  writeFileSync(`${rootDir}/${CONSTANTS.FILES.LAST_TIME}`, JSON.stringify({ time: new Date().getTime() }));
 
-  const sendedVideos = readFile(`${rootDir}/sendedVideos.json`) || [];
-  const sendedStreams = readFile(`${rootDir}/sendedStreams.json`) || [];
+  const sendedVideos = readFileSync(`${rootDir}/${CONSTANTS.FILES.SENDED_VIDEOS}`) || [];
+  const sendedStreams = readFileSync(`${rootDir}/${CONSTANTS.FILES.SENDED_STREAMS}`) || [];
 
-  let videosInfo = [];
-  let streamsInfo = [];
   let batchPromises = [];
 
+  // 處理影片頻道
   videosChannels.forEach((item) => {
-    const url = YT_domain + '/' + item.channelId + '/';
+    const url = CONSTANTS.YOUTUBE.DOMAIN + '/' + item.channelId + '/';
     switch (config.CRAWLER_TYPE) {
       case 'puppeteer':
         batchPromises.push(puppeteerCrawler(url, item.channelId));
@@ -73,8 +74,9 @@ async function execute(client) {
     }
   });
 
+  // 處理直播頻道
   streamsChannels.forEach((item) => {
-    const url = YT_domain + '/' + item.channelId + '/';
+    const url = CONSTANTS.YOUTUBE.DOMAIN + '/' + item.channelId + '/';
     switch (config.CRAWLER_TYPE) {
       case 'puppeteer':
         batchPromises.push(puppeteerCrawler(url, item.channelId));
@@ -87,9 +89,14 @@ async function execute(client) {
     }
   });
 
-  // 處理所有Promise
+  // 處理所有Promise並整理結果
+  let videosInfo = [];
+  let streamsInfo = [];
+  
   await Promise.all(batchPromises).then(async (results) => {
     results.forEach((result) => {
+      if (!result) return; // 跳過失敗的請求
+      
       switch (result.type) {
         case 'videos':
           videosInfo.push(...result.data);
@@ -101,208 +108,246 @@ async function execute(client) {
     });
 
     // 寫入發送清單
-    writeFile(`${rootDir}/videos.json`, JSON.stringify(videosInfo));
-    writeFile(`${rootDir}/streams.json`, JSON.stringify(streamsInfo));
+    writeFileSync(`${rootDir}/${CONSTANTS.FILES.VIDEOS}`, JSON.stringify(videosInfo));
+    writeFileSync(`${rootDir}/${CONSTANTS.FILES.STREAMS}`, JSON.stringify(streamsInfo));
 
-    // #region 更新YT頻道更新時間
+    await logger.info('爬蟲結果', { 
+      videosCount: videosInfo.length, 
+      streamsCount: streamsInfo.length 
+    });
+
+    // 更新頻道最後更新時間
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
+    const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
 
-    videosChannels = readFile(`${rootDir}/videosChannels.json`).data || []; // 重撈清單
+    // 重新讀取頻道清單以確保數據一致性
+    videosChannels = readFileSync(`${rootDir}/${CONSTANTS.FILES.VIDEOS_CHANNELS}`).data || [];
     videosInfo.forEach(function (item1) {
       videosChannels.forEach(function (item2) {
         if (item1.channelId == item2.channelId) {
-          item2.last_updated = `${year}/${month}/${day}`;
+          item2.last_updated = dateStr;
         }
       });
     });
 
-    streamsChannels = readFile(`${rootDir}/streamsChannels.json`).data || []; // 重撈清單
+    streamsChannels = readFileSync(`${rootDir}/${CONSTANTS.FILES.STREAMS_CHANNELS}`).data || [];
     streamsInfo.forEach(function (item1) {
       streamsChannels.forEach(function (item2) {
         if (item1.channelId == item2.channelId) {
-          item2.last_updated = `${year}/${month}/${day}`;
+          item2.last_updated = dateStr;
         }
       });
     });
 
-    writeFile(
-      `${rootDir}/videosChannels.json`,
+    writeFileSync(
+      `${rootDir}/${CONSTANTS.FILES.VIDEOS_CHANNELS}`,
       JSON.stringify({ data: videosChannels })
     );
 
-    writeFile(
-      `${rootDir}/streamsChannels.json`,
+    writeFileSync(
+      `${rootDir}/${CONSTANTS.FILES.STREAMS_CHANNELS}`,
       JSON.stringify({ data: streamsChannels })
     );
-    // #endregion
 
-    // 寫入已發送清單
+    // 更新已發送清單
     if (videosInfo.length > 0) {
-      writeFile(
-        `${rootDir}/sendedVideos.json`,
+      writeFileSync(
+        `${rootDir}/${CONSTANTS.FILES.SENDED_VIDEOS}`,
         JSON.stringify(sendedVideos.concat(videosInfo))
       );
-      console.log('本日影片已儲存！');
-      await sendMessage(client, config.VIDEO_CHANNEL_ID, '本日新影片已成功抓取！');
-    }
-    else {
-      await sendMessage(client, config.VIDEO_CHANNEL_ID, '爬蟲結束，無新影片');
+      await logger.info('新影片已儲存', { count: videosInfo.length });
+      await sendMessage(client, config.VIDEO_CHANNEL_ID, CONSTANTS.SUCCESS.CRAWLER_SUCCESS_VIDEOS);
+    } else {
+      await sendMessage(client, config.VIDEO_CHANNEL_ID, CONSTANTS.INFO.NO_NEW_VIDEOS);
     }
 
     if (streamsInfo.length > 0) {
-      writeFile(
-        `${rootDir}/sendedStreams.json`,
+      writeFileSync(
+        `${rootDir}/${CONSTANTS.FILES.SENDED_STREAMS}`,
         JSON.stringify(sendedStreams.concat(streamsInfo))
       );
-      console.log('本日直播已儲存！');
-      await sendMessage(client, config.STREAM_CHANNEL_ID, '本日新直播已成功抓取！');
-    }
-    else {
-      await sendMessage(client, config.STREAM_CHANNEL_ID, '爬蟲結束，無新直播');
+      await logger.info('新直播已儲存', { count: streamsInfo.length });
+      await sendMessage(client, config.STREAM_CHANNEL_ID, CONSTANTS.SUCCESS.CRAWLER_SUCCESS_STREAMS);
+    } else {
+      await sendMessage(client, config.STREAM_CHANNEL_ID, CONSTANTS.INFO.NO_NEW_STREAMS);
     }
   });
 
-  console.log('爬蟲結束！');
+  await logger.info('爬蟲任務完成');
 }
 
 async function fetchCrawler(url, type, sendedVideosOrStreams) {
   const fetchUrl = `${url}${type}`;
   let crawlerResults = [];
 
-  return fetch(fetchUrl, {
-    method: 'GET',
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-      'Accept-Language': 'zh-TW,zh;q=0.9'
-  }
-  })
-    .then(async (response) => {
-      if (response.ok) {
-        return response.text();
-      } else {
-        // 網址為404則移除該頻道
-        if (response.status == 404) {
-          const YTchannelID = new URL(url).pathname.replaceAll('/', '');
-          removeYTChannel(type, YTchannelID);
-          await sendMessage(DCclient, config.VIDEO_CHANNEL_ID, `移除頻道: ${fetchUrl}`);
-          return;
-        }
+  try {
+    const response = await fetch(fetchUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': CONSTANTS.YOUTUBE.USER_AGENT,
+        'Accept-Language': CONSTANTS.YOUTUBE.ACCEPT_LANGUAGE
       }
-    })
-    .then((data) => {
-      const $ = cheerio.load(data); // 載入 body
-      const scriptElement = $('script').filter(function () {
-        return /var ytInitialData =/.test($(this).html());
-      }); // 取得ytInitialData
-      let jsonData = scriptElement.html().replace(/var ytInitialData =/, ''); // 取得ytInitialData的json資料
-      jsonData = jsonData.replace(/;/g, '');
-      jsonData = JSON.parse(jsonData);
+    });
 
-      let tabNums; // 影片或直播的tab位置
-      switch (type) {
-        case 'videos':
-          tabNums = 1;
-          break;
-        case 'streams':
-          tabNums = 3;
-          break;
+    if (!response.ok) {
+      // 網址為404則移除該頻道
+      if (response.status === 404) {
+        const YTchannelID = new URL(url).pathname.replaceAll('/', '');
+        await removeYTChannel(type, YTchannelID);
+        await sendMessage(DCclient, config.VIDEO_CHANNEL_ID, `移除無效頻道: ${fetchUrl}`);
+        await logger.warn('移除無效頻道', { channelId: YTchannelID, url: fetchUrl, status: response.status });
+        return null;
       }
-      const channelID = jsonData.metadata.channelMetadataRenderer.ownerUrls[0]
-        .split('/')
-        .pop();
-      const videos =
-        jsonData.contents.twoColumnBrowseResultsRenderer.tabs[tabNums]
-          .tabRenderer.content.richGridRenderer.contents;
-      const streamTypes = ['upcoming', 'live', 'ended']; // 直播類型：upcoming: 預定發布直播，live: 直播中，ended: 直播結束
-      const catchNums = 5; // 每次抓影片數量
+      
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
 
-      let index = 0;
-      for (let item of videos) {
-        if (index == catchNums) break;
-        index++;
+    const data = await response.text();
+    const $ = cheerio.load(data);
+    
+    // 尋找包含 ytInitialData 的 script 標籤
+    const scriptElement = $('script').filter(function () {
+      return /var ytInitialData =/.test($(this).html());
+    });
 
-        if (item.richItemRenderer !== undefined) {
-          const videoJson = item.richItemRenderer.content.videoRenderer;
-          const videoId = videoJson.videoId;
-          const videoTitle = videoJson.title.runs[0].text;
-          const videoThumbnail = videoJson.thumbnail.thumbnails[0].fetchUrl;
-          const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-          const peopleObj = videoJson.viewCountText; // 人數資料暫存
+    if (scriptElement.length === 0) {
+      throw new Error('找不到 ytInitialData 腳本');
+    }
 
-          let videoPublishedTime = ''; // 發佈時間(影片或是直播結束才有)
-          let videoDuration = ''; // 影片長度
-          let videoViewCount = ''; // 觀看人數
-          let streamType = ''; // 直播類型
+    let jsonData = scriptElement.html().replace(/var ytInitialData =/, '');
+    jsonData = jsonData.replace(/;/g, '');
+    jsonData = JSON.parse(jsonData);
 
-          try {
-            switch (type) {
-              // 影片
-              case 'videos':
-                videoPublishedTime = videoJson.publishedTimeText.simpleText;
-                videoDuration = videoJson.lengthText.simpleText;
-                videoViewCount = peopleObj.simpleText;
+    // 確定影片或直播的tab位置
+    let tabNums;
+    switch (type) {
+      case 'videos':
+        tabNums = 1;
+        break;
+      case 'streams':
+        tabNums = 3;
+        break;
+      default:
+        throw new Error(`不支援的內容類型: ${type}`);
+    }
+
+    // 獲取頻道資訊
+    const channelID = jsonData.metadata?.channelMetadataRenderer?.ownerUrls?.[0]?.split('/').pop();
+    if (!channelID) {
+      throw new Error('無法獲取頻道ID');
+    }
+
+    // 獲取影片/直播列表
+    const videos = jsonData.contents?.twoColumnBrowseResultsRenderer?.tabs?.[tabNums]
+      ?.tabRenderer?.content?.richGridRenderer?.contents;
+    
+    if (!videos) {
+      throw new Error('無法獲取影片列表');
+    }
+
+    const streamTypes = ['upcoming', 'live', 'ended'];
+    let index = 0;
+
+    for (let item of videos) {
+      if (index >= CONSTANTS.CRAWLER.VIDEOS_PER_BATCH) break;
+      index++;
+
+      if (!item.richItemRenderer) continue;
+
+      const videoJson = item.richItemRenderer.content.videoRenderer;
+      if (!videoJson) continue;
+
+      const videoId = videoJson.videoId;
+      const videoTitle = videoJson.title?.runs?.[0]?.text;
+      const videoThumbnail = videoJson.thumbnail?.thumbnails?.[0]?.url;
+      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+      if (!videoId || !videoTitle) continue;
+
+      // 檢查是否已發送過
+      if (checkIsSended(sendedVideosOrStreams, videoId)) {
+        continue;
+      }
+
+      let videoPublishedTime = '';
+      let videoDuration = '';
+      let videoViewCount = '';
+      let streamType = '';
+
+      try {
+        switch (type) {
+          case 'videos':
+            videoPublishedTime = videoJson.publishedTimeText?.simpleText || '';
+            videoDuration = videoJson.lengthText?.simpleText || '';
+            videoViewCount = videoJson.viewCountText?.simpleText || '';
+            break;
+
+          case 'streams':
+            const overlayStyle = videoJson.thumbnailOverlays?.[0]
+              ?.thumbnailOverlayTimeStatusRenderer?.style;
+            
+            switch (overlayStyle) {
+              case 'UPCOMING':
+                videoPublishedTime = parseInt(videoJson.upcomingEventData?.startTime || 0);
+                streamType = streamTypes[0];
                 break;
-
-              // 直播
-              case 'streams':
-                // 判斷直播類型
-                switch (
-                  videoJson.thumbnailOverlays[0]
-                    .thumbnailOverlayTimeStatusRenderer.style
-                ) {
-                  // 預定發布直播
-                  case 'UPCOMING':
-                    let startTime = videoJson.upcomingEventData.startTime;
-                    videoPublishedTime = parseInt(startTime);
-                    streamType = streamTypes[0];
-                    break;
-                  // 直播中
-                  case 'LIVE':
-                    streamType = streamTypes[1];
-                    videoViewCount = videoJson.shortViewCountText.runs[0].text;
-                    break;
-                  // 直播結束
-                  case 'DEFAULT':
-                    videoPublishedTime = videoJson.publishedTimeText.simpleText;
-                    videoDuration = videoJson.lengthText.simpleText;
-                    videoViewCount = peopleObj.simpleText;
-                    streamType = streamTypes[2];
-                    break;
-                }
+              case 'LIVE':
+                streamType = streamTypes[1];
+                videoViewCount = videoJson.shortViewCountText?.runs?.[0]?.text || '';
+                break;
+              case 'DEFAULT':
+                videoPublishedTime = videoJson.publishedTimeText?.simpleText || '';
+                videoDuration = videoJson.lengthText?.simpleText || '';
+                videoViewCount = videoJson.viewCountText?.simpleText || '';
+                streamType = streamTypes[2];
+                break;
             }
-          } catch (error) {
-            addErrorLog(error);
-          }
-
-          // 判斷是否已發送過
-          if (checkIsSended(sendedVideosOrStreams, videoId)) {
-            continue;
-          }
-
-          if (!checkTime(videoPublishedTime || new Date() / 1000)) continue; // 判斷影片是否今天發佈，不是則跳過
-
-          crawlerResults.push({
-            id: videoId,
-            title: videoTitle,
-            link: videoUrl,
-            pic: videoThumbnail,
-            time: videoPublishedTime || '直播中',
-            duration: videoDuration || '無',
-            views: videoViewCount,
-            channelId: channelID,
-          });
+            break;
         }
+      } catch (parseError) {
+        await logger.warn('解析影片資訊時發生錯誤', { 
+          videoId, 
+          error: parseError.message 
+        });
       }
 
-      return {
-        type: type,
-        data: crawlerResults,
-      };
-    })
-    .catch((error) => addErrorLog(error));
+      // 檢查影片是否為今天發布
+      if (!checkTime(videoPublishedTime || new Date() / 1000)) {
+        continue;
+      }
+
+      crawlerResults.push({
+        id: videoId,
+        title: videoTitle,
+        link: videoUrl,
+        pic: videoThumbnail,
+        time: videoPublishedTime || (streamType === 'live' ? '直播中' : ''),
+        duration: videoDuration || '無',
+        views: videoViewCount || '',
+        channelId: channelID,
+        streamType: streamType
+      });
+    }
+
+    await logger.debug('爬蟲完成', { 
+      type, 
+      channelId: channelID, 
+      resultCount: crawlerResults.length 
+    });
+
+    return {
+      type: type,
+      data: crawlerResults,
+    };
+
+  } catch (error) {
+    await logger.error('爬蟲失敗', { 
+      url: fetchUrl, 
+      type, 
+      error: error.message 
+    });
+    return null;
+  }
 }
 
 // 棄用
