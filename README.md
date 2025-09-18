@@ -82,6 +82,71 @@ pm2 stop yt_dc_bot
 
 ---
 
+## 系統架構
+```mermaid
+graph TD
+    subgraph User Interaction
+        User[使用者]
+    end
+
+    subgraph Discord
+        DiscordAPI[Discord API]
+        VideoChannel[影片頻道]
+        StreamChannel[直播頻道]
+    end
+
+    subgraph Application
+        subgraph Core
+            App[app.mjs - 機器人主程式]
+            Config[src/config.mjs - 設定檔]
+            Functions[src/functions.mjs - 共用函式]
+        end
+
+        subgraph Crawler
+            CrawlerModule[src/crawler.mjs - 爬蟲模組]
+            Puppeteer[Puppeteer]
+            FetchAPI[Fetch API]
+        end
+
+        subgraph Commands
+            DeployCommands[src/deploy-command.mjs - 指令部署]
+            CommandHandlers[commands/ - 指令處理]
+        end
+
+        subgraph Deployment
+            PM2[PM2 - ecosystem.config.cjs]
+        end
+    end
+
+    subgraph External Services
+        YouTube[YouTube]
+    end
+
+    %% Connections
+    User -- 輸入指令 --> DiscordAPI
+    DiscordAPI -- 事件/指令 --> App
+
+    App -- 讀取設定 --> Config
+    App -- 使用 --> Functions
+    App -- 觸發爬蟲 --> CrawlerModule
+    App -- 執行指令 --> CommandHandlers
+    App -- 推播訊息 --> VideoChannel
+    App -- 推播訊息 --> StreamChannel
+
+    CrawlerModule -- 使用 --> Puppeteer
+    CrawlerModule -- 使用 --> FetchAPI
+    Puppeteer -- 爬取資料 --> YouTube
+    FetchAPI -- 爬取資料 --> YouTube
+    YouTube -- 回傳資料 --> CrawlerModule
+    CrawlerModule -- 回傳結果 --> App
+
+    DeployCommands -- 註冊指令 --> DiscordAPI
+
+    PM2 -- 管理/啟動 --> App
+```
+
+---
+
 # YT Video, Stream Crawler, Discord Robot Push Broadcast (Auto/Manual)
 
 ## Installation Guide
@@ -163,3 +228,57 @@ pm2 stop yt_dc_bot
 - PM2
 - YouTube API
 - Puppeteer/Fetch API
+
+---
+
+## System Architecture
+```mermaid
+graph TD
+    subgraph User Interaction
+        User[User]
+    end
+    subgraph Discord
+        DiscordAPI[Discord API]
+        VideoChannel[Video Channel]
+        StreamChannel[Stream Channel]
+    end
+    subgraph Application
+        subgraph Core
+            App[app.mjs - Bot Main Program]
+            Config[src/config.mjs - Config File]
+            Functions[src/functions.mjs - Common Functions]
+        end
+        subgraph Crawler
+            CrawlerModule[src/crawler.mjs - Crawler Module]
+            Puppeteer[Puppeteer]
+            FetchAPI[Fetch API]
+        end
+        subgraph Commands
+            DeployCommands[src/deploy-command.mjs - Command Deployment]
+            CommandHandlers[commands/ - Command Handlers]
+        end
+        subgraph Deployment
+            PM2[PM2 - ecosystem.config.cjs]
+        end
+    end
+    subgraph External Services
+        YouTube[YouTube]
+    end
+    %% Connections
+    User -- Input Commands --> DiscordAPI
+    DiscordAPI -- Events/Commands --> App
+    App -- Load Config --> Config
+    App -- Use --> Functions
+    App -- Trigger Crawler --> CrawlerModule
+    App -- Execute Commands --> CommandHandlers
+    App -- Push Messages --> VideoChannel
+    App -- Push Messages --> StreamChannel
+    CrawlerModule -- Use --> Puppeteer
+    CrawlerModule -- Use --> FetchAPI
+    Puppeteer -- Crawl Data --> YouTube
+    FetchAPI -- Crawl Data --> YouTube
+    YouTube -- Return Data --> CrawlerModule
+    CrawlerModule -- Return Results --> App
+    DeployCommands -- Register Commands --> DiscordAPI
+    PM2 -- Manage/Start --> App
+```
