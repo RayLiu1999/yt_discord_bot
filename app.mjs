@@ -12,7 +12,13 @@ import {
   generateDependencyReport,
 } from "@discordjs/voice";
 
-import { delay, readFile, sendMessage, sendVideo, addErrorLog } from "#src/functions";
+import {
+  delay,
+  readFile,
+  sendMessage,
+  sendVideo,
+  addErrorLog,
+} from "#src/functions";
 import crawler from "#src/crawler";
 import config from "#src/config";
 import { rootDir } from "#src/path";
@@ -43,12 +49,24 @@ for (const entry of fs.readdirSync(foldersPath, { withFileTypes: true })) {
   if (entry.isDirectory()) {
     // 子資料夾內的指令
     const commandsPath = path.join(foldersPath, entry.name);
-    const files = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
-    for (const file of files) {
-      const filePath = path.join(commandsPath, file);
-      await loadCommand(filePath);
+    const files = fs
+      .readdirSync(commandsPath)
+      .filter((f) => f.endsWith(".js") || f.endsWith(".mjs"));
+
+    // 如果資料夾中有 index 文件，則僅載入 index (避免把子指令當成頂層指令載入)
+    const indexFile = files.find((f) => f === "index.mjs" || f === "index.js");
+    if (indexFile) {
+      await loadCommand(path.join(commandsPath, indexFile));
+    } else {
+      for (const file of files) {
+        const filePath = path.join(commandsPath, file);
+        await loadCommand(filePath);
+      }
     }
-  } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.mjs'))) {
+  } else if (
+    entry.isFile() &&
+    (entry.name.endsWith(".js") || entry.name.endsWith(".mjs"))
+  ) {
     // 直接位於 commands 目錄下的指令檔
     const filePath = path.join(foldersPath, entry.name);
     await loadCommand(filePath);
@@ -62,7 +80,9 @@ async function loadCommand(filePath) {
     if (command && command.data && command.execute) {
       client.commands.set(command.data.name, command);
     } else {
-      addErrorLog(`[警告] ${filePath} 指令缺少必要的 'data' 或 'execute' 屬性。`);
+      addErrorLog(
+        `[警告] ${filePath} 指令缺少必要的 'data' 或 'execute' 屬性。`
+      );
     }
   } catch (err) {
     addErrorLog(`[錯誤] 載入指令 ${filePath} 失敗：${err.message}`);
@@ -415,7 +435,12 @@ client.on(Events.MessageCreate, async (message) => {
 
   // 播放剛剛播放的音樂
   if (message.content.startsWith(PREFIX + "restart")) {
-    if (voiceChannelConnection && player && player.state.status !== AudioPlayerStatus.Paused && player.state.status !== AudioPlayerStatus.Playing) {
+    if (
+      voiceChannelConnection &&
+      player &&
+      player.state.status !== AudioPlayerStatus.Paused &&
+      player.state.status !== AudioPlayerStatus.Playing
+    ) {
       audioStream = fs.createReadStream("output.mp4");
       playMusic(voiceChannelConnection, player, audioStream);
       message.reply("音樂已重新播放");
@@ -445,8 +470,7 @@ client.on(Events.MessageCreate, async (message) => {
       });
 
       message.reply("音樂開始循環播放");
-    }
-    else {
+    } else {
       message.reply("請先將機器人加入語音頻道");
     }
   }
@@ -459,17 +483,24 @@ client.on(Events.ClientReady, async (interaction) => {
   const minutes = now.getMinutes();
   const seconds = now.getSeconds();
   const milliseconds = now.getMilliseconds();
-  const timeToNextHalfHour = (30 - minutes % 30) * 60 * 1000 - seconds * 1000 - milliseconds;
-  const timeToNextHour = (60 - minutes) * 60 * 1000 - seconds * 1000 - milliseconds;
+  const timeToNextHalfHour =
+    (30 - (minutes % 30)) * 60 * 1000 - seconds * 1000 - milliseconds;
+  const timeToNextHour =
+    (60 - minutes) * 60 * 1000 - seconds * 1000 - milliseconds;
 
-  let intervalTime = timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour
+  let intervalTime =
+    timeToNextHalfHour > timeToNextHour ? timeToNextHour : timeToNextHalfHour;
   async function startTimer() {
-    console.log('啟動時間：' + new Date().toLocaleString());
-    console.log('距離下一次執行時間：' + Math.round(intervalTime / 1000 / 60 * 10) / 10 + '分鐘');
+    console.log("啟動時間：" + new Date().toLocaleString());
+    console.log(
+      "距離下一次執行時間：" +
+        Math.round((intervalTime / 1000 / 60) * 10) / 10 +
+        "分鐘"
+    );
 
     setTimeout(async () => {
       // 開始執行時間
-      console.log('開始抓取時間：' + new Date().toLocaleString());
+      console.log("開始抓取時間：" + new Date().toLocaleString());
 
       let timeInterval = 30 * 60 * 1000; // 時間間隔(預設30分鐘)
       let executeHour = new Date().getHours();
@@ -480,18 +511,18 @@ client.on(Events.ClientReady, async (interaction) => {
         try {
           // 執行爬蟲
           await crawler(client);
-    
+
           await delay(300);
-    
+
           // 獲取發送清單
-          sendVideo(client, 'videos.json', config.VIDEO_CHANNEL_ID);
-          sendVideo(client, 'streams.json', config.STREAM_CHANNEL_ID);
+          sendVideo(client, "videos.json", config.VIDEO_CHANNEL_ID);
+          sendVideo(client, "streams.json", config.STREAM_CHANNEL_ID);
         } catch (error) {
           addErrorLog(error);
-          sendMessage(client, config.VIDEO_CHANNEL_ID, '影片抓取失敗！');
-          sendMessage(client, config.STREAM_CHANNEL_ID, '直播抓取失敗！');
+          sendMessage(client, config.VIDEO_CHANNEL_ID, "影片抓取失敗！");
+          sendMessage(client, config.STREAM_CHANNEL_ID, "直播抓取失敗！");
         }
-        console.log('結束抓取時間：' + new Date().toLocaleString());
+        console.log("結束抓取時間：" + new Date().toLocaleString());
       }
 
       // 假設現在為午夜11:30，下一次間隔改為20分鐘
@@ -508,7 +539,10 @@ client.on(Events.ClientReady, async (interaction) => {
       let curMinutes = new Date().getMinutes();
       let curSeconds = new Date().getSeconds();
       let curMilliseconds = new Date().getMilliseconds();
-      let diff = (curMinutes - executeMinute) * 60 * 1000 + (curSeconds - 0) * 1000 + (curMilliseconds - 0);
+      let diff =
+        (curMinutes - executeMinute) * 60 * 1000 +
+        (curSeconds - 0) * 1000 +
+        (curMilliseconds - 0);
 
       // 重新計算時間(間隔 - 偏差)
       intervalTime = timeInterval - diff;
@@ -523,7 +557,7 @@ client.on(Events.ClientReady, async (interaction) => {
 
 // 加入語音頻道
 function botJoinVoiceChannel(voiceChannel) {
-  if (voiceChannelConnection !== null || voiceChannelConnection !== undefined) {    
+  if (voiceChannelConnection !== null || voiceChannelConnection !== undefined) {
     voiceChannelConnection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: voiceChannel.guild.id,
