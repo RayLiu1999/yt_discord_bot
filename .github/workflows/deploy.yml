@@ -27,7 +27,6 @@ jobs:
 
       - name: Create .env file
         run: |
-          echo "NODE_ENV=production" >> .env
           echo "TOKEN=${{ secrets.TOKEN }}" >> .env
           echo "CLIENT_ID=${{ secrets.CLIENT_ID }}" >> .env
           echo "GUILD_ID=${{ secrets.GUILD_ID }}" >> .env
@@ -53,6 +52,13 @@ jobs:
           rsync -avz --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
+            --exclude 'sendedStreams.json' \
+            --exclude 'sendedVideos.json' \
+            --exclude 'streams.json' \
+            --exclude 'streamsChannels.json' \
+            --exclude 'videos.json' \
+            --exclude 'videosChannels.json' \
+            --exclude 'lastTime.json' \
             ./ \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/htdocs/${{ secrets.SITE_DOMAIN }}/
 
