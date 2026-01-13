@@ -7,7 +7,8 @@
   "scripts": {
     "start": "pm2 start ecosystem.config.cjs --env production",
     "dev": "nodemon app.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "node src/deploy-command.mjs"
   },
   "imports": {
     "#src/*": "./src/*.mjs",
@@ -23,6 +24,7 @@
     "dotenv": "^16.0.3",
     "libsodium-wrappers": "^0.7.15",
     "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.10",
     "puppeteer": "^23.10.4",
     "ytdl-core": "npm:@distube/ytdl-core@^4.15.8"
   }

@@ -39,23 +39,33 @@ const player = createAudioPlayer();
 let audioStream;
 let voiceChannelConnection;
 
-for (const folder of commandFolders) {
-  const commandsPath = path.join(foldersPath, folder);
-  const commandFiles = fs
-    .readdirSync(commandsPath)
-    .filter((file) => file.endsWith(".js"));
+for (const entry of fs.readdirSync(foldersPath, { withFileTypes: true })) {
+  if (entry.isDirectory()) {
+    // 子資料夾內的指令
+    const commandsPath = path.join(foldersPath, entry.name);
+    const files = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
+    for (const file of files) {
+      const filePath = path.join(commandsPath, file);
+      await loadCommand(filePath);
+    }
+  } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.mjs'))) {
+    // 直接位於 commands 目錄下的指令檔
+    const filePath = path.join(foldersPath, entry.name);
+    await loadCommand(filePath);
+  }
+}
 
-  for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = await import(filePath);
-    // 將指令名稱設為鍵值，導出的模組設為值，存入 Collection 中
-    if ("data" in command && "execute" in command) {
+async function loadCommand(filePath) {
+  try {
+    const mod = await import(path.resolve(filePath));
+    const command = mod.default ?? mod;
+    if (command && command.data && command.execute) {
       client.commands.set(command.data.name, command);
     } else {
-      addErrorLog(
-        `[警告] ${filePath} 指令缺少必要的 'data' 或 'execute' 屬性。`
-      );
+      addErrorLog(`[警告] ${filePath} 指令缺少必要的 'data' 或 'execute' 屬性。`);
     }
+  } catch (err) {
+    addErrorLog(`[錯誤] 載入指令 ${filePath} 失敗：${err.message}`);
   }
 }
 

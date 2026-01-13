@@ -9,3 +9,4 @@ lastTime.json
 *.txt
 .env
 error.log
+.DS_Store
