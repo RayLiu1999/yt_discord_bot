@@ -288,7 +288,9 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
                   // 直播中
                   case "LIVE":
                     streamType = streamTypes[1];
-                    videoViewCount = videoJson.shortViewCountText.runs[0].text;
+                    videoViewCount = videoJson.shortViewCountText?.runs?.[0]?.text 
+                      || videoJson.shortViewCountText?.simpleText 
+                      || "";
                     break;
                   // 直播結束
                   case "DEFAULT":
