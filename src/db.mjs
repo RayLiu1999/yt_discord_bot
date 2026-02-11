@@ -41,7 +41,7 @@ const sentItemSchema = new mongoose.Schema({
 });
 
 sentItemSchema.index({ videoId: 1, type: 1 });
-sentItemSchema.index({ sentAt: 1 });
+sentItemSchema.index({ sentAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 }); // 7 天後自動清除
 
 // 應用程式狀態（取代 lastTime.json）
 const appStateSchema = new mongoose.Schema({

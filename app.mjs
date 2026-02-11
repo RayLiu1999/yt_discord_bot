@@ -1,16 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
-
 import {
-  delay,
-  sendMessage,
-  sendVideo,
-  addErrorLog,
-  getChannels,
-  addChannel,
-  removeChannel,
-} from "#src/functions";
+  Client,
+  Collection,
+  Events,
+  GatewayIntentBits,
+  MessageFlags,
+} from "discord.js";
+
+import { sendMessage, addErrorLog } from "#src/functions";
 import crawler from "#src/crawler";
 import config from "#src/config";
 import { connectDB } from "#src/db";
@@ -20,12 +18,7 @@ await connectDB();
 
 // 建立 Discord 客戶端實例
 const client = new Client({
-  intents: [
-    GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+  intents: [GatewayIntentBits.DirectMessages, GatewayIntentBits.Guilds],
 });
 
 client.commands = new Collection();
@@ -75,7 +68,14 @@ async function loadCommand(filePath) {
   }
 }
 
-// 內建指令
+// 指令頻道限制映射：指令名稱 → 允許的 Discord 頻道 ID 列表
+const commandChannelMap = {
+  crawl: [config.VIDEO_CHANNEL_ID, config.STREAM_CHANNEL_ID],
+  video: [config.VIDEO_CHANNEL_ID],
+  stream: [config.STREAM_CHANNEL_ID],
+};
+
+// 斜線指令處理
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -86,6 +86,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  // 頻道限制檢查
+  const allowedChannels = commandChannelMap[interaction.commandName];
+  if (allowedChannels && !allowedChannels.includes(interaction.channelId)) {
+    await interaction.reply({
+      content: "此指令無法在這個頻道使用！",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   try {
     await command.execute(interaction);
   } catch (error) {
@@ -93,138 +103,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp({
         content: "執行指令時發生錯誤！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } else {
       await interaction.reply({
         content: "執行指令時發生錯誤！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
-    }
-  }
-});
-
-// 自訂指令
-client.on(Events.MessageCreate, async (message) => {
-  const PREFIX = "!";
-  if (message.author.bot) return;
-
-  // 取影片連結
-  switch (message.content) {
-    // 爬影片
-    case PREFIX + "clr":
-      try {
-        await crawler(client);
-      } catch (error) {
-        console.log(error);
-        await message.reply("影片抓取失敗！");
-      }
-      break;
-
-    // 取影片channelId清單
-    case PREFIX + "vd ls": {
-      const videosChannels = await getChannels("videos");
-      let sendStr = "";
-      videosChannels.forEach(function (item) {
-        const lastUpdated = item.last_updated || "無";
-        sendStr += `${item.channelId} - ${lastUpdated}\n`;
-      });
-      message.channel.send(sendStr || "清單為空");
-      break;
-    }
-
-    // 取直播channelId清單
-    case PREFIX + "st ls": {
-      const streamsChannels = await getChannels("streams");
-      let sendStr = "";
-      streamsChannels.forEach(function (item) {
-        const lastUpdated = item.last_updated || "無";
-        sendStr += `${item.channelId} - ${lastUpdated}\n`;
-      });
-      message.channel.send(sendStr || "清單為空");
-      break;
-    }
-  }
-
-  // 影片新增清單
-  if (message.content.startsWith(PREFIX + "vd add")) {
-    let channelID = message.content.split(" ")[2];
-    if (channelID === undefined || channelID === null || channelID === "") {
-      message.channel.send("請輸入頻道ID！");
-      return;
-    }
-
-    // 檢查是否已存在
-    const existing = await getChannels("videos");
-    if (existing.some((item) => item.channelId === channelID)) {
-      message.channel.send("此頻道已存在！");
-      return;
-    }
-
-    try {
-      await addChannel(channelID, "videos");
-      message.channel.send("新增成功！");
-    } catch (error) {
-      addErrorLog(error);
-      message.channel.send("新增失敗！");
-    }
-  }
-
-  // 直播新增清單
-  if (message.content.startsWith(PREFIX + "st add")) {
-    let channelID = message.content.split(" ")[2];
-    if (channelID === undefined || channelID === null || channelID === "") {
-      message.channel.send("請輸入頻道ID！");
-      return;
-    }
-
-    // 檢查是否已存在
-    const existing = await getChannels("streams");
-    if (existing.some((item) => item.channelId === channelID)) {
-      message.channel.send("此頻道已存在！");
-      return;
-    }
-
-    try {
-      await addChannel(channelID, "streams");
-      message.channel.send("新增成功！");
-    } catch (error) {
-      addErrorLog(error);
-      message.channel.send("新增失敗！");
-    }
-  }
-
-  // 影片刪除清單
-  if (message.content.startsWith(PREFIX + "vd del")) {
-    let channelID = message.content.split(" ")[2];
-    if (channelID === undefined || channelID === null || channelID === "") {
-      message.channel.send("請輸入頻道ID！");
-      return;
-    }
-
-    try {
-      await removeChannel(channelID, "videos");
-      message.channel.send("刪除成功！");
-    } catch (error) {
-      addErrorLog(error);
-      message.channel.send("刪除失敗！");
-    }
-  }
-
-  // 直播刪除清單
-  if (message.content.startsWith(PREFIX + "st del")) {
-    let channelID = message.content.split(" ")[2];
-    if (channelID === undefined || channelID === null || channelID === "") {
-      message.channel.send("請輸入頻道ID！");
-      return;
-    }
-
-    try {
-      await removeChannel(channelID, "streams");
-      message.channel.send("刪除成功！");
-    } catch (error) {
-      addErrorLog(error);
-      message.channel.send("刪除失敗！");
     }
   }
 });
