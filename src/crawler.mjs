@@ -15,6 +15,7 @@ import {
   getAppState,
   setAppState,
   removeChannel,
+  checkAndRemoveInactiveChannels,
 } from "#src/functions";
 import config from "#src/config";
 
@@ -26,6 +27,9 @@ async function execute(client) {
   DCclient = client;
 
   console.log("開始爬蟲...");
+
+  // 清理過期頻道
+  await checkAndRemoveInactiveChannels(client);
 
   // 從 MongoDB 讀取頻道清單
   const videosChannels = await getChannels("videos");

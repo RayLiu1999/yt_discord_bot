@@ -1,4 +1,5 @@
 import { Channel, SentItem, AppState } from "#src/db";
+import config from "#src/config";
 
 // 延遲函數
 function delay(time) {
@@ -161,6 +162,45 @@ async function setAppState(key, value) {
   );
 }
 
+// 檢查並移除超過 3 個月未更新的頻道
+async function checkAndRemoveInactiveChannels(client) {
+  console.log("開始檢查並移除超過 3 個月未更新的頻道...");
+  const THREE_MONTHS = 90 * 24 * 60 * 60 * 1000;
+  const now = new Date();
+
+  // 檢查影片頻道
+  const videoChannels = await getChannels("videos");
+  for (const channel of videoChannels) {
+    if (!channel.last_updated) continue; // 若無記錄則跳過（可能是新加入）
+
+    const lastDate = new Date(channel.last_updated);
+
+    if (isNaN(lastDate.getTime())) continue;
+    if (now - lastDate > THREE_MONTHS) {
+      await removeChannel(channel.channelId, "videos");
+      const msg = `[自動清理] 移除超過 3 個月未更新的影片頻道：${channel.channelId} (最後更新：${channel.last_updated})`;
+      console.log(msg);
+      await sendMessage(client, config.VIDEO_CHANNEL_ID, msg);
+    }
+  }
+
+  // 檢查直播頻道
+  const streamChannels = await getChannels("streams");
+  for (const channel of streamChannels) {
+    if (!channel.last_updated) continue;
+
+    const lastDate = new Date(channel.last_updated);
+    if (isNaN(lastDate.getTime())) continue;
+
+    if (now - lastDate > THREE_MONTHS) {
+      await removeChannel(channel.channelId, "streams");
+      const msg = `[自動清理] 移除超過 3 個月未更新的直播頻道：${channel.channelId} (最後更新：${channel.last_updated})`;
+      console.log(msg);
+      await sendMessage(client, config.STREAM_CHANNEL_ID, msg);
+    }
+  }
+}
+
 export {
   delay,
   checkTime,
@@ -176,4 +216,5 @@ export {
   addSentItems,
   getAppState,
   setAppState,
+  checkAndRemoveInactiveChannels,
 };
