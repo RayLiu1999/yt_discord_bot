@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  bot:
+    # 告訴 Portainer 使用當前目錄 (Git root) 的 Dockerfile 建置
+    build: .
+    container_name: yt_discord_bot
+    restart: unless-stopped
+
+    # 環境變數設定 (Portainer UI 可覆蓋)
+    environment:
+      - TOKEN=
+      - CLIENT_ID=
+      - GUILD_ID=
+      - VIDEO_CHANNEL_ID=
+      - STREAM_CHANNEL_ID=
+      - CRAWLER_TYPE=fetch
+      # MongoDB 連線字串 (若使用主機上的 DB，host 可能需改為 host.docker.internal 或真實 IP)
+      - MONGODB_URI=mongodb://user:password@host.docker.internal:27017/yt_discord_bot?authSource=admin
+      - WEBHOOK_URL=
+
+    # 若需存取主機網路 (例如連線主機上的 MongoDB)
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"

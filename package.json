@@ -5,10 +5,12 @@
   "type": "module",
   "main": "app.mjs",
   "scripts": {
-    "start": "pm2 start ecosystem.config.cjs --env production",
+    "start": "node app.mjs",
     "dev": "nodemon app.mjs",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy": "node src/deploy-command.mjs"
+    "deploy": "node src/deploy-command.mjs",
+    "db:init": "node scripts/init-db.mjs",
+    "db:seed": "node scripts/seed.mjs"
   },
   "imports": {
     "#src/*": "./src/*.mjs",
@@ -17,15 +19,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@discordjs/opus": "^0.9.0",
-    "@discordjs/voice": "^0.18.0",
     "cheerio": "^1.0.0-rc.12",
     "discord.js": "^14.11.0",
     "dotenv": "^16.0.3",
-    "libsodium-wrappers": "^0.7.15",
-    "node-fetch": "^3.3.2",
-    "nodemon": "^3.1.10",
-    "puppeteer": "^23.10.4",
-    "ytdl-core": "npm:@distube/ytdl-core@^4.15.8"
+    "mongoose": "^8.10.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

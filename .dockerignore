@@ -1,0 +1,21 @@
+node_modules
+.git
+.github
+.env
+.DS_Store
+
+# 運行時 JSON 資料檔（已遷移到 MongoDB）
+videosChannels.json
+streamsChannels.json
+sendedVideos.json
+sendedStreams.json
+videos.json
+streams.json
+lastTime.json
+
+# 開發相關
+nodemon.json
+ecosystem.config.cjs
+*.txt
+error.log
+output.mp4

@@ -1,4 +1,4 @@
-name: Deploy to VPS
+name: Trigger Portainer Webhook
 
 on:
   push:
@@ -8,75 +8,9 @@ on:
       - "v*"
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Create .env file
+      - name: Call Portainer Webhook
         run: |
-          echo "TOKEN=${{ secrets.TOKEN }}" >> .env
-          echo "CLIENT_ID=${{ secrets.CLIENT_ID }}" >> .env
-          echo "GUILD_ID=${{ secrets.GUILD_ID }}" >> .env
-          echo "VIDEO_CHANNEL_ID=${{ secrets.VIDEO_CHANNEL_ID }}" >> .env
-          echo "STREAM_CHANNEL_ID=${{ secrets.STREAM_CHANNEL_ID }}" >> .env
-          echo "CRAWLER_TYPE=fetch" >> .env
-          echo "WEBHOOK_URL=${{ secrets.WEBHOOK_URL }}" >> .env
-
-      - name: Set up SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_DEPLOY_KEY }}
-
-      - name: Add remote host to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Copy project to server
-        run: |
-          echo "Deploying to VPS..."
-          rsync -avz --delete \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude 'sendedStreams.json' \
-            --exclude 'sendedVideos.json' \
-            --exclude 'streams.json' \
-            --exclude 'streamsChannels.json' \
-            --exclude 'videos.json' \
-            --exclude 'videosChannels.json' \
-            --exclude 'lastTime.json' \
-            ./ \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/htdocs/${{ secrets.SITE_DOMAIN }}/
-
-      - name: Run remote deploy/reload command
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_DEPLOY_KEY }}
-          script: |
-            cd ~/htdocs/${{ secrets.SITE_DOMAIN }}
-            # 確保環境變數包含 node/pnpm (如果是透過 nvm 安裝)
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-            # 若 VPS 沒裝 pnpm, 可在此加入安裝碼; 這裡先假設已裝
-            pnpm install
-            pnpm deploy # 註冊 Slash Commands
-            pm2 reload ecosystem.config.cjs --env production
-            pm2 save
-            echo "Deployed!"
+          curl -X POST "${{ secrets.PORTAINER_WEBHOOK }}"
