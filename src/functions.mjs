@@ -92,9 +92,17 @@ async function sendVideo(client, videos, channelId) {
   }
 }
 
-// 新增錯誤log
+// 新增錯誤 log（安全處理各種錯誤類型）
 function addErrorLog(error) {
-  console.error(error);
+  if (error instanceof Error) {
+    console.error(`[錯誤] ${error.message}`);
+    if (error.stack) console.error(error.stack);
+  } else if (error !== null && error !== undefined) {
+    console.error("[錯誤]", JSON.stringify(error, null, 2));
+  } else {
+    console.error("[錯誤] 收到空的錯誤物件（undefined / null）");
+    console.trace(); // 印出呼叫堆疊，方便追蹤來源
+  }
 }
 
 // ===== 資料庫操作函數 =====

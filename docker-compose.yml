@@ -9,6 +9,7 @@ services:
 
     # 環境變數設定 (Portainer UI 可覆蓋)
     environment:
+      - TZ=Asia/Taipei
       - TOKEN=${TOKEN}
       - CLIENT_ID=${CLIENT_ID}
       - GUILD_ID=${GUILD_ID}

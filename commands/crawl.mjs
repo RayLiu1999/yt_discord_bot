@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import crawler from "#src/crawler";
+import { addErrorLog } from "#src/functions";
 
 export const data = new SlashCommandBuilder()
   .setName("crawl")
@@ -13,7 +14,7 @@ export async function execute(interaction) {
     await crawler(interaction.client);
     await interaction.followUp("爬蟲執行完畢！");
   } catch (error) {
-    console.error(error);
-    await interaction.followUp("影片抓取失敗！");
+    addErrorLog(error);
+    await interaction.followUp("爬蟲執行失敗！");
   }
 }

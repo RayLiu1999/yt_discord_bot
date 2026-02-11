@@ -1,5 +1,12 @@
 FROM node:22-slim
 
+# 設定時區
+ENV TZ=Asia/Taipei
+RUN apt-get update && apt-get install -y tzdata && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
+    rm -rf /var/lib/apt/lists/*
+
+
 # 安裝 pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
