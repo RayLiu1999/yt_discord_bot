@@ -105,26 +105,28 @@ async function execute(client) {
     await sendVideo(client, videosInfo, config.VIDEO_CHANNEL_ID);
     await addSentItems(videosInfo, "videos");
     console.log("本日影片已儲存！");
-    await sendMessage(
-      client,
-      config.VIDEO_CHANNEL_ID,
-      "本日新影片已成功抓取！",
-    );
+    // await sendMessage(
+    //   client,
+    //   config.VIDEO_CHANNEL_ID,
+    //   "本日新影片已成功抓取！",
+    // );
   } else {
-    await sendMessage(client, config.VIDEO_CHANNEL_ID, "爬蟲結束，無新影片");
+    console.log("爬蟲結束，無新影片");
+    // await sendMessage(client, config.VIDEO_CHANNEL_ID, "爬蟲結束，無新影片");
   }
 
   if (streamsInfo.length > 0) {
     await sendVideo(client, streamsInfo, config.STREAM_CHANNEL_ID);
     await addSentItems(streamsInfo, "streams");
     console.log("本日直播已儲存！");
-    await sendMessage(
-      client,
-      config.STREAM_CHANNEL_ID,
-      "本日新直播已成功抓取！",
-    );
+    // await sendMessage(
+    //   client,
+    //   config.STREAM_CHANNEL_ID,
+    //   "本日新直播已成功抓取！",
+    // );
   } else {
-    await sendMessage(client, config.STREAM_CHANNEL_ID, "爬蟲結束，無新直播");
+    console.log("爬蟲結束，無新直播");
+    // await sendMessage(client, config.STREAM_CHANNEL_ID, "爬蟲結束，無新直播");
   }
 
   // 更新最後爬蟲時間
