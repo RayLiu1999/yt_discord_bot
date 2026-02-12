@@ -69,7 +69,9 @@ async function execute(client) {
   results.forEach((result) => {
     if (!result) return;
     if (result.error) {
-      failedChannels.push(result.url);
+      // 記錄失敗的類型與 URL，方便排查
+      const typeLabel = result.type === "streams" ? "直播" : "影片";
+      failedChannels.push(`[${typeLabel}] ${result.url}`);
       return;
     }
 
@@ -84,6 +86,7 @@ async function execute(client) {
   });
 
   if (failedChannels.length > 0) {
+    console.error(`抓取失敗的頻道：\n${failedChannels.join("\n")}`);
     const errorMsg = `以下頻道抓取失敗：\n${failedChannels.join("\n")}`;
     await sendMessage(client, config.VIDEO_CHANNEL_ID, errorMsg);
   }
@@ -151,6 +154,9 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
       if (response.ok) {
         return response.text();
       } else {
+        // 記錄 HTTP 錯誤狀態碼
+        addErrorLog(`[HTTP 錯誤] ${fetchUrl} 回應狀態碼：${response.status}`);
+
         // 網址為404則移除該頻道
         if (response.status == 404) {
           const YTchannelID = new URL(url).pathname.replaceAll("/", "");
@@ -160,7 +166,6 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
             config.VIDEO_CHANNEL_ID,
             `移除頻道: ${fetchUrl}`,
           );
-          return { type: type, error: true, url: fetchUrl };
         }
         return { type: type, error: true, url: fetchUrl };
       }
@@ -277,6 +282,7 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
       };
     })
     .catch((error) => {
+      addErrorLog(`[爬蟲錯誤] ${fetchUrl} 抓取失敗：`);
       addErrorLog(error);
       return { type: type, error: true, url: fetchUrl };
     });
