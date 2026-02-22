@@ -245,11 +245,36 @@ async function markLiveScheduleNotified(videoId) {
   return LiveSchedule.updateOne({ videoId }, { $set: { isNotified: true } });
 }
 
-// 發送直播開始通知到 Discord
+// 切換直播通知訂閱（開啟/關閉）
+async function toggleLiveNotification(userId) {
+  const existing = await LiveNotificationUser.findOne({ userId });
+  if (existing) {
+    await LiveNotificationUser.deleteOne({ userId });
+    return false; // 代表目前狀態：已關閉
+  } else {
+    await LiveNotificationUser.create({ userId });
+    return true; // 代表目前狀態：已開啟
+  }
+}
+
+// 取得所有有開啟通知訂閱的使用者 ID
+async function getAllSubscribedUsers() {
+  const users = await LiveNotificationUser.find({}).lean();
+  return users.map((u) => u.userId);
+}
+
+// 發送直播開始通知到 Discord（包含 Tag 訂閱者）
 async function sendLiveNotification(client, schedule) {
   const videoUrl = `https://www.youtube.com/watch?v=${schedule.videoId}`;
-  const userTag = schedule.requestUserId ? `<@${schedule.requestUserId}> ` : "";
-  const message = `🔴 **直播開始啦！**\n${userTag}${schedule.title || "直播"}\n${videoUrl}`;
+
+  // 取得所有訂閱者
+  const subscribedUsers = await getAllSubscribedUsers();
+
+  // 組裝 Tag 字串（例如：<@123> <@456> ）
+  const tagsStr = subscribedUsers.map((id) => `<@${id}>`).join(" ");
+  const userTagPrefix = tagsStr ? `${tagsStr} ` : "";
+
+  const message = `🔴 **直播開始啦！**\n${userTagPrefix}${schedule.title || "直播"}\n${videoUrl}`;
 
   await sendMessage(client, schedule.discordChannelId, message);
 }
@@ -273,5 +298,7 @@ export {
   addLiveSchedule,
   getPendingLiveSchedules,
   markLiveScheduleNotified,
+  toggleLiveNotification,
+  getAllSubscribedUsers,
   sendLiveNotification,
 };

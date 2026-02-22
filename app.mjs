@@ -80,6 +80,7 @@ const commandChannelMap = {
   crawl: [config.VIDEO_CHANNEL_ID, config.STREAM_CHANNEL_ID],
   video: [config.VIDEO_CHANNEL_ID],
   stream: [config.STREAM_CHANNEL_ID],
+  notify_live: [config.STREAM_CHANNEL_ID],
 };
 
 // 斜線指令處理

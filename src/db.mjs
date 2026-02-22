@@ -68,9 +68,19 @@ liveScheduleSchema.index(
   { expireAfterSeconds: 30 * 24 * 60 * 60 },
 ); // 30 天後自動清除
 
+// 直播通知訂閱使用者
+const liveNotificationUserSchema = new mongoose.Schema({
+  userId: { type: String, required: true, unique: true }, // Discord 使用者 ID
+  createdAt: { type: Date, default: Date.now },
+});
+
 // ===== Model 匯出 =====
 
 export const Channel = mongoose.model("Channel", channelSchema);
 export const SentItem = mongoose.model("SentItem", sentItemSchema);
 export const AppState = mongoose.model("AppState", appStateSchema);
 export const LiveSchedule = mongoose.model("LiveSchedule", liveScheduleSchema);
+export const LiveNotificationUser = mongoose.model(
+  "LiveNotificationUser",
+  liveNotificationUserSchema,
+);
