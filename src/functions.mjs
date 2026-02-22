@@ -1,4 +1,10 @@
-import { Channel, SentItem, AppState, LiveSchedule } from "#src/db";
+import {
+  Channel,
+  SentItem,
+  AppState,
+  LiveSchedule,
+  LiveNotificationUser,
+} from "#src/db";
 import config from "#src/config";
 
 // 延遲函數

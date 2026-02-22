@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { toggleLiveNotification, addErrorLog } from "#src/functions";
 
 export const data = new SlashCommandBuilder()
@@ -23,7 +23,7 @@ export async function execute(interaction) {
     addErrorLog(`[/notify_live 指令錯誤] ${error.message}`);
     await interaction.reply({
       content: "切換通知狀態失敗，請稍後再試！",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 }
