@@ -8,7 +8,14 @@ import {
   MessageFlags,
 } from "discord.js";
 
-import { sendMessage, addErrorLog, getAppState } from "#src/functions";
+import {
+  sendMessage,
+  addErrorLog,
+  getAppState,
+  getPendingLiveSchedules,
+  markLiveScheduleNotified,
+  sendLiveNotification,
+} from "#src/functions";
 import crawler from "#src/crawler";
 import config from "#src/config";
 import { connectDB } from "#src/db";
@@ -130,6 +137,7 @@ const MIN_CRAWL_INTERVAL = 15 * 60 * 1000;
 // 機器人準備就緒後啟動排程
 client.on(Events.ClientReady, async () => {
   scheduleNextCrawl();
+  startLiveScheduleChecker();
 });
 
 function scheduleNextCrawl() {
@@ -181,6 +189,39 @@ function scheduleNextCrawl() {
 client.once(Events.ClientReady, (c) => {
   console.log(`準備完成！已登入為 ${c.user.tag}`);
 });
+
+// ===== 直播排程通知檢查器 =====
+
+// 每分鐘檢查一次是否有到時間的直播排程
+const LIVE_CHECK_INTERVAL = 60 * 1000; // 1 分鐘
+
+function startLiveScheduleChecker() {
+  console.log("[直播排程] 通知檢查器已啟動（每分鐘檢查一次）");
+
+  setInterval(async () => {
+    try {
+      const pendingSchedules = await getPendingLiveSchedules();
+
+      if (pendingSchedules.length === 0) return;
+
+      console.log(`[直播排程] 發現 ${pendingSchedules.length} 筆待通知的直播`);
+
+      for (const schedule of pendingSchedules) {
+        try {
+          await sendLiveNotification(client, schedule);
+          await markLiveScheduleNotified(schedule.videoId);
+          console.log(
+            `[直播排程] 已通知：${schedule.title} (${schedule.videoId})`,
+          );
+        } catch (notifyErr) {
+          addErrorLog(`[直播排程] 通知失敗：${notifyErr.message}`);
+        }
+      }
+    } catch (error) {
+      addErrorLog(`[直播排程] 檢查排程時發生錯誤：${error.message}`);
+    }
+  }, LIVE_CHECK_INTERVAL);
+}
 
 // 使用 Discord 客戶端 token 登入
 client.login(config.TOKEN);

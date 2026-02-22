@@ -16,6 +16,7 @@ import {
   setAppState,
   removeChannel,
   checkAndRemoveInactiveChannels,
+  addLiveSchedule,
 } from "#src/functions";
 import config from "#src/config";
 
@@ -170,7 +171,7 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
         return { type: type, error: true, url: fetchUrl };
       }
     })
-    .then((data) => {
+    .then(async (data) => {
       if (data?.error) return data;
       const $ = cheerio.load(data);
       const scriptElement = $("script").filter(function () {
@@ -235,6 +236,24 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
                     let startTime = videoJson.upcomingEventData.startTime;
                     videoPublishedTime = parseInt(startTime);
                     streamType = streamTypes[0];
+
+                    // 將即將開始的直播存入排程，到時間時自動發送 Discord 通知
+                    try {
+                      await addLiveSchedule({
+                        videoId,
+                        channelId: channelID,
+                        title: videoTitle,
+                        discordChannelId: config.STREAM_CHANNEL_ID,
+                        scheduledStartTime: parseInt(startTime),
+                      });
+                      console.log(
+                        `[直播排程] 已新增/更新：${videoTitle} (${videoId})`,
+                      );
+                    } catch (scheduleErr) {
+                      addErrorLog(
+                        `[直播排程] 儲存失敗：${scheduleErr.message}`,
+                      );
+                    }
                     break;
                   case "LIVE":
                     streamType = streamTypes[1];

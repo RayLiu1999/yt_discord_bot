@@ -1,4 +1,4 @@
-import { Channel, SentItem, AppState } from "#src/db";
+import { Channel, SentItem, AppState, LiveSchedule } from "#src/db";
 import config from "#src/config";
 
 // 延遲函數
@@ -209,6 +209,51 @@ async function checkAndRemoveInactiveChannels(client) {
   }
 }
 
+// ===== 直播排程相關函數 =====
+
+// 新增直播排程（若已存在則更新開播時間）
+async function addLiveSchedule(data) {
+  return LiveSchedule.findOneAndUpdate(
+    { videoId: data.videoId },
+    {
+      $set: {
+        channelId: data.channelId,
+        title: data.title,
+        discordChannelId: data.discordChannelId,
+        scheduledStartTime: data.scheduledStartTime,
+      },
+      $setOnInsert: {
+        isNotified: false,
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true, new: true },
+  );
+}
+
+// 取得所有待通知的直播排程（時間已到且尚未通知）
+async function getPendingLiveSchedules() {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return LiveSchedule.find({
+    isNotified: false,
+    scheduledStartTime: { $lte: nowSeconds },
+  }).lean();
+}
+
+// 標記直播排程為已通知
+async function markLiveScheduleNotified(videoId) {
+  return LiveSchedule.updateOne({ videoId }, { $set: { isNotified: true } });
+}
+
+// 發送直播開始通知到 Discord
+async function sendLiveNotification(client, schedule) {
+  const videoUrl = `https://www.youtube.com/watch?v=${schedule.videoId}`;
+  const userTag = schedule.requestUserId ? `<@${schedule.requestUserId}> ` : "";
+  const message = `🔴 **直播開始啦！**\n${userTag}${schedule.title || "直播"}\n${videoUrl}`;
+
+  await sendMessage(client, schedule.discordChannelId, message);
+}
+
 export {
   delay,
   checkTime,
@@ -225,4 +270,8 @@ export {
   getAppState,
   setAppState,
   checkAndRemoveInactiveChannels,
+  addLiveSchedule,
+  getPendingLiveSchedules,
+  markLiveScheduleNotified,
+  sendLiveNotification,
 };

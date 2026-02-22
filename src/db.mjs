@@ -50,8 +50,27 @@ const appStateSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+// 直播追蹤排程
+const liveScheduleSchema = new mongoose.Schema({
+  videoId: { type: String, required: true, unique: true }, // YouTube 影片 ID
+  channelId: { type: String, required: true }, // YouTube 頻道 ID
+  title: String, // 直播標題
+  discordChannelId: { type: String, required: true }, // 發送通知的 Discord 頻道 ID
+  requestUserId: String, // 要求追蹤的 Discord 使用者 ID，可選，用於 Tag
+  scheduledStartTime: { type: Number, required: true }, // 預計開播的 Unix Timestamp（秒）
+  isNotified: { type: Boolean, default: false }, // 是否已通知
+  createdAt: { type: Date, default: Date.now },
+});
+
+liveScheduleSchema.index({ isNotified: 1, scheduledStartTime: 1 }); // 查詢效能優化
+liveScheduleSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 30 * 24 * 60 * 60 },
+); // 30 天後自動清除
+
 // ===== Model 匯出 =====
 
 export const Channel = mongoose.model("Channel", channelSchema);
 export const SentItem = mongoose.model("SentItem", sentItemSchema);
 export const AppState = mongoose.model("AppState", appStateSchema);
+export const LiveSchedule = mongoose.model("LiveSchedule", liveScheduleSchema);
