@@ -10,3 +10,4 @@ lastTime.json
 .env
 error.log
 .DS_Store
+/backups
