@@ -8,16 +8,14 @@
     "start": "node app.mjs",
     "dev": "nodemon app.mjs",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy": "node src/deploy-command.mjs",
-    "db:init": "node scripts/init-db.mjs",
-    "db:seed": "node scripts/seed.mjs"
+    "deploy": "node src/deploy-command.mjs"
   },
   "imports": {
     "#src/*": "./src/*.mjs",
     "#*": "./*"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "discord.js": "^14.11.0",
