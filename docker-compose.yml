@@ -17,7 +17,6 @@ services:
       - STREAM_CHANNEL_ID=${STREAM_CHANNEL_ID}
       - CRAWLER_TYPE=${CRAWLER_TYPE}
       - MONGODB_URI=${MONGODB_URI}
-      - WEBHOOK_URL=${WEBHOOK_URL}
 
     # 若需存取主機網路 (例如連線主機上的 MongoDB)
     # extra_hosts:
