@@ -88,4 +88,29 @@ function parseLockupItem(item, type) {
   };
 }
 
-export { extractBadge, parseScheduledTime, parseLockupItem };
+// 從整頁 ytInitialData JSON 取出頻道 ID 與指定分頁（videos/streams）前 catchNums 筆解析結果
+function parsePageVideos(jsonData, type, catchNums = 5) {
+  const channelID = jsonData.metadata.channelMetadataRenderer.ownerUrls[0]
+    .split("/")
+    .pop();
+
+  const tabNums = type === "streams" ? 3 : 1;
+  const contents =
+    jsonData.contents.twoColumnBrowseResultsRenderer.tabs[tabNums]
+      .tabRenderer.content.richGridRenderer.contents;
+
+  const items = [];
+  for (let i = 0; i < contents.length && i < catchNums; i++) {
+    const parsed = parseLockupItem(contents[i], type);
+    if (parsed) items.push(parsed);
+  }
+
+  return { channelID, items };
+}
+
+export {
+  extractBadge,
+  parseScheduledTime,
+  parseLockupItem,
+  parsePageVideos,
+};

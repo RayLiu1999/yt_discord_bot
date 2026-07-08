@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractBadge, parseScheduledTime, parseLockupItem } from "#src/youtube-parser";
+import { extractBadge, parseScheduledTime, parseLockupItem, parsePageVideos } from "#src/youtube-parser";
 
 test("extractBadge - 從 thumbnailBottomOverlayViewModel 取出 badge", () => {
   const lockup = {
@@ -333,4 +333,51 @@ test("parseLockupItem - 已結束的直播（streams 分頁）", () => {
     streamType: "ended",
     scheduledStartTime: null,
   });
+});
+
+function buildPage(tabIndex, contents) {
+  const tabs = [];
+  for (let i = 0; i < 8; i++) {
+    if (i === tabIndex) {
+      tabs.push({ tabRenderer: { content: { richGridRenderer: { contents } } } });
+    } else {
+      tabs.push({ tabRenderer: {} });
+    }
+  }
+  return {
+    metadata: {
+      channelMetadataRenderer: { ownerUrls: ["https://www.youtube.com/@NASA"] },
+    },
+    contents: { twoColumnBrowseResultsRenderer: { tabs } },
+  };
+}
+
+test("parsePageVideos - 從 videos 分頁（index 1）取出頻道 ID 與影片", () => {
+  const jsonData = buildPage(1, [normalVideoItem, { continuationItemRenderer: {} }]);
+  const result = parsePageVideos(jsonData, "videos");
+  assert.equal(result.channelID, "@NASA");
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].videoId, "aRSBZN2UF0Q");
+});
+
+test("parsePageVideos - 從 streams 分頁（index 3）取出直播", () => {
+  const jsonData = buildPage(3, [liveStreamItem, upcomingStreamItem]);
+  const result = parsePageVideos(jsonData, "streams");
+  assert.equal(result.items.length, 2);
+  assert.equal(result.items[0].streamType, "live");
+  assert.equal(result.items[1].streamType, "upcoming");
+});
+
+test("parsePageVideos - 遵守 catchNums 限制", () => {
+  const contents = [
+    normalVideoItem,
+    normalVideoItem,
+    normalVideoItem,
+    normalVideoItem,
+    normalVideoItem,
+    normalVideoItem,
+  ];
+  const jsonData = buildPage(1, contents);
+  const result = parsePageVideos(jsonData, "videos", 3);
+  assert.equal(result.items.length, 3);
 });
