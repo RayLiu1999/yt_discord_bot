@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node app.mjs",
     "dev": "nodemon app.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test",
     "deploy": "node src/deploy-command.mjs"
   },
   "imports": {
