@@ -55,7 +55,11 @@ function parseLockupItem(item, type) {
   let scheduledStartTime = null;
 
   if (type === "streams") {
-    // Task 4、5、6 會補上這裡的分支
+    if (badge.badgeStyle === "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE") {
+      streamType = "live";
+      viewCount = metadataParts[0]?.text?.content || "";
+    }
+    // Task 5、6 會補上 upcoming / ended 分支
   } else {
     viewCount = metadataParts[0]?.text?.content || "";
     publishedTimeText = metadataParts[1]?.text?.content || "";

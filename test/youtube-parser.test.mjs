@@ -139,3 +139,64 @@ test("parseLockupItem - 沒有 lockupViewModel 時回傳 null", () => {
     null,
   );
 });
+
+const liveStreamItem = {
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        contentId: "wuh6NqhLu6U",
+        contentImage: {
+          thumbnailViewModel: {
+            image: {
+              sources: [
+                { url: "https://i.ytimg.com/vi/wuh6NqhLu6U/hqdefault.jpg" },
+              ],
+            },
+            overlays: [
+              {
+                thumbnailBottomOverlayViewModel: {
+                  badges: [
+                    {
+                      thumbnailBadgeViewModel: {
+                        text: "直播",
+                        badgeStyle: "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        metadata: {
+          lockupMetadataViewModel: {
+            title: { content: "【PEAK】its a peak content" },
+            metadata: {
+              contentMetadataViewModel: {
+                metadataRows: [
+                  {
+                    metadataParts: [{ text: { content: "3141 人正在觀看" } }],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+test("parseLockupItem - 直播中（streams 分頁）", () => {
+  const result = parseLockupItem(liveStreamItem, "streams");
+  assert.deepEqual(result, {
+    videoId: "wuh6NqhLu6U",
+    title: "【PEAK】its a peak content",
+    thumbnail: "https://i.ytimg.com/vi/wuh6NqhLu6U/hqdefault.jpg",
+    publishedTimeText: "",
+    duration: "",
+    viewCount: "3141 人正在觀看",
+    streamType: "live",
+    scheduledStartTime: null,
+  });
+});
