@@ -270,3 +270,67 @@ test("parseLockupItem - 即將直播（streams 分頁）", () => {
     scheduledStartTime: expectedTime,
   });
 });
+
+const endedStreamItem = {
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        contentId: "O_v3xQRsEBk",
+        contentImage: {
+          thumbnailViewModel: {
+            image: {
+              sources: [
+                { url: "https://i.ytimg.com/vi/O_v3xQRsEBk/hqdefault.jpg" },
+              ],
+            },
+            overlays: [
+              {
+                thumbnailBottomOverlayViewModel: {
+                  badges: [
+                    {
+                      thumbnailBadgeViewModel: {
+                        text: "4:10:23",
+                        badgeStyle: "THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        metadata: {
+          lockupMetadataViewModel: {
+            title: { content: "【Clock Rogue】hard mode...?" },
+            metadata: {
+              contentMetadataViewModel: {
+                metadataRows: [
+                  {
+                    metadataParts: [
+                      { text: { content: "觀看次數：2.5萬次" } },
+                      { text: { content: "直播時間：23 小時前" } },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+test("parseLockupItem - 已結束的直播（streams 分頁）", () => {
+  const result = parseLockupItem(endedStreamItem, "streams");
+  assert.deepEqual(result, {
+    videoId: "O_v3xQRsEBk",
+    title: "【Clock Rogue】hard mode...?",
+    thumbnail: "https://i.ytimg.com/vi/O_v3xQRsEBk/hqdefault.jpg",
+    publishedTimeText: "直播時間：23 小時前",
+    duration: "4:10:23",
+    viewCount: "觀看次數：2.5萬次",
+    streamType: "ended",
+    scheduledStartTime: null,
+  });
+});

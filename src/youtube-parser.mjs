@@ -64,8 +64,12 @@ function parseLockupItem(item, type) {
         metadataParts[0]?.text?.content || "",
       );
       publishedTimeText = scheduledStartTime;
+    } else {
+      streamType = "ended";
+      viewCount = metadataParts[0]?.text?.content || "";
+      publishedTimeText = metadataParts[1]?.text?.content || "";
+      duration = badge.text || "";
     }
-    // Task 6 會補上 ended 分支
   } else {
     viewCount = metadataParts[0]?.text?.content || "";
     publishedTimeText = metadataParts[1]?.text?.content || "";
