@@ -209,11 +209,17 @@ function startLiveScheduleChecker() {
 
       for (const schedule of pendingSchedules) {
         try {
-          await sendLiveNotification(client, schedule);
-          await markLiveScheduleNotified(schedule.videoId);
-          console.log(
-            `[直播排程] 已通知：${schedule.title} (${schedule.videoId})`,
-          );
+          const sent = await sendLiveNotification(client, schedule);
+          if (sent) {
+            await markLiveScheduleNotified(schedule.videoId);
+            console.log(
+              `[直播排程] 已通知：${schedule.title} (${schedule.videoId})`,
+            );
+          } else {
+            addErrorLog(
+              `[直播排程] 通知發送失敗，暫不標記為已通知，下次將重試：${schedule.title} (${schedule.videoId})`,
+            );
+          }
         } catch (notifyErr) {
           addErrorLog(`[直播排程] 通知失敗：${notifyErr.message}`);
         }

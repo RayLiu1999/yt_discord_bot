@@ -57,28 +57,41 @@ function checkIsSended(sendedItems, videoId) {
   return false;
 }
 
-// 發送訊息
+// 發送訊息（回傳是否發送成功，讓呼叫端可以判斷是否要標記為已完成）
 async function sendMessage(client, channelId, message) {
-  const channel = client.channels.cache.get(channelId);
+  let channel = client.channels.cache.get(channelId);
+  if (!channel) {
+    // cache 未命中時（例如重啟後尚未快取到），改用 fetch 直接向 API 查詢
+    try {
+      channel = await client.channels.fetch(channelId);
+    } catch (fetchError) {
+      addErrorLog("找不到頻道", fetchError);
+      return false;
+    }
+  }
   if (!channel) {
     addErrorLog("找不到頻道");
-    return;
+    return false;
   }
   try {
     await channel.send(message);
     console.log("訊息已發送！-" + new Date().toLocaleString());
+    return true;
   } catch (error) {
     addErrorLog("訊息發送失敗：", error);
+    return false;
   }
 }
 
 // 發送影片（接收陣列參數，不再讀檔）
+// 回傳是否所有訊息都發送成功，呼叫端應依此判斷是否要標記為已發送
 async function sendVideo(client, videos, channelId) {
   if (!videos || videos.length === 0) {
     console.log("最新影片皆已發送！-" + new Date().toLocaleString());
     return false;
   }
 
+  let allSucceeded = true;
   let links = [];
   for (let i = 0; i < videos.length; i++) {
     if (links.includes(videos[i].link)) continue;
@@ -87,24 +100,38 @@ async function sendVideo(client, videos, channelId) {
 
     // 每次發送5個
     if (links.length === 5) {
-      await sendMessage(client, channelId, links.join("\n"));
+      const sent = await sendMessage(client, channelId, links.join("\n"));
+      if (!sent) allSucceeded = false;
       links = [];
     }
   }
 
   // 發送剩餘的
   if (links.length > 0) {
-    await sendMessage(client, channelId, links.join("\n"));
+    const sent = await sendMessage(client, channelId, links.join("\n"));
+    if (!sent) allSucceeded = false;
   }
+
+  return allSucceeded;
 }
 
-// 新增錯誤 log（安全處理各種錯誤類型）
-function addErrorLog(error) {
+// 新增錯誤 log（安全處理各種錯誤類型，可額外附上情境說明）
+function addErrorLog(context, error) {
+  // 只傳一個參數時，維持原本行為：該參數本身就是錯誤內容
+  if (arguments.length === 1) {
+    error = context;
+    context = undefined;
+  }
+
+  const prefix = context ? `[錯誤] ${context}` : "[錯誤]";
+
   if (error instanceof Error) {
-    console.error(`[錯誤] ${error.message}`);
+    console.error(`${prefix} ${error.message}`);
     if (error.stack) console.error(error.stack);
   } else if (error !== null && error !== undefined) {
-    console.error("[錯誤]", JSON.stringify(error, null, 2));
+    console.error(prefix, JSON.stringify(error, null, 2));
+  } else if (context !== undefined) {
+    console.error(prefix);
   } else {
     console.error("[錯誤] 收到空的錯誤物件（undefined / null）");
     console.trace(); // 印出呼叫堆疊，方便追蹤來源
@@ -270,6 +297,7 @@ async function getAllSubscribedUsers() {
 }
 
 // 發送直播開始通知到 Discord（包含 Tag 訂閱者）
+// 回傳是否發送成功，呼叫端應依此判斷是否要標記為已通知
 async function sendLiveNotification(client, schedule) {
   const videoUrl = `https://www.youtube.com/watch?v=${schedule.videoId}`;
 
@@ -282,7 +310,7 @@ async function sendLiveNotification(client, schedule) {
 
   const message = `🔴 **直播開始啦！**\n${userTagPrefix}${schedule.title || "直播"}\n${videoUrl}`;
 
-  await sendMessage(client, schedule.discordChannelId, message);
+  return sendMessage(client, schedule.discordChannelId, message);
 }
 
 export {
