@@ -381,3 +381,18 @@ test("parsePageVideos - 遵守 catchNums 限制", () => {
   const result = parsePageVideos(jsonData, "videos", 3);
   assert.equal(result.items.length, 3);
 });
+
+test("parsePageVideos - catchNums 計數包含解析失敗的項目（不只是有效項目）", () => {
+  const contents = [
+    normalVideoItem,
+    { continuationItemRenderer: {} },
+    normalVideoItem,
+    normalVideoItem,
+    normalVideoItem,
+  ];
+  const jsonData = buildPage(1, contents);
+  const result = parsePageVideos(jsonData, "videos", 3);
+  // 前 3 個 contents 元素中只有 2 個是有效影片（第 2 個是 continuationItemRenderer，解析結果是 null）
+  // 如果 catchNums 錯誤地只數「有效項目」，這裡會拿到 3 筆而不是 2 筆
+  assert.equal(result.items.length, 2);
+});
