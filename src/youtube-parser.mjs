@@ -32,4 +32,46 @@ function parseScheduledTime(text) {
   return Math.floor(date.getTime() / 1000);
 }
 
-export { extractBadge, parseScheduledTime };
+// 解析單一 richItemRenderer 項目。type 為 "videos" 或 "streams"，
+// 影響 metadataRows 與 badge 的判讀方式。找不到資料時回傳 null。
+function parseLockupItem(item, type) {
+  const lockup = item?.richItemRenderer?.content?.lockupViewModel;
+  if (!lockup) return null;
+
+  const videoId = lockup.contentId || "";
+  const title =
+    lockup.metadata?.lockupMetadataViewModel?.title?.content || "";
+  const thumbnail =
+    lockup.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url || "";
+  const badge = extractBadge(lockup);
+  const metadataParts =
+    lockup.metadata?.lockupMetadataViewModel?.metadata
+      ?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts || [];
+
+  let streamType = "";
+  let publishedTimeText = "";
+  let duration = "";
+  let viewCount = "";
+  let scheduledStartTime = null;
+
+  if (type === "streams") {
+    // Task 4、5、6 會補上這裡的分支
+  } else {
+    viewCount = metadataParts[0]?.text?.content || "";
+    publishedTimeText = metadataParts[1]?.text?.content || "";
+    duration = badge.text || "";
+  }
+
+  return {
+    videoId,
+    title,
+    thumbnail,
+    publishedTimeText,
+    duration,
+    viewCount,
+    streamType,
+    scheduledStartTime,
+  };
+}
+
+export { extractBadge, parseScheduledTime, parseLockupItem };

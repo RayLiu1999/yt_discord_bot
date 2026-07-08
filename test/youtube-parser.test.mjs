@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractBadge, parseScheduledTime } from "#src/youtube-parser";
+import { extractBadge, parseScheduledTime, parseLockupItem } from "#src/youtube-parser";
 
 test("extractBadge - 從 thumbnailBottomOverlayViewModel 取出 badge", () => {
   const lockup = {
@@ -59,4 +59,83 @@ test("parseScheduledTime - 解析上午時間", () => {
 test("parseScheduledTime - 格式不符回傳 null", () => {
   assert.equal(parseScheduledTime("觀看次數：17萬次"), null);
   assert.equal(parseScheduledTime(""), null);
+});
+
+const normalVideoItem = {
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        contentId: "aRSBZN2UF0Q",
+        contentImage: {
+          thumbnailViewModel: {
+            image: {
+              sources: [
+                {
+                  url: "https://i.ytimg.com/vi/aRSBZN2UF0Q/hqdefault.jpg",
+                  width: 168,
+                  height: 94,
+                },
+              ],
+            },
+            overlays: [
+              {
+                thumbnailBottomOverlayViewModel: {
+                  badges: [
+                    {
+                      thumbnailBadgeViewModel: {
+                        text: "1:05",
+                        badgeStyle: "THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        metadata: {
+          lockupMetadataViewModel: {
+            title: { content: "Moon Base: June 2026 Update" },
+            metadata: {
+              contentMetadataViewModel: {
+                metadataRows: [
+                  {
+                    metadataParts: [
+                      { text: { content: "觀看次數：17萬次" } },
+                      { text: { content: "7 天前" } },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+test("parseLockupItem - 一般影片（videos 分頁）", () => {
+  const result = parseLockupItem(normalVideoItem, "videos");
+  assert.deepEqual(result, {
+    videoId: "aRSBZN2UF0Q",
+    title: "Moon Base: June 2026 Update",
+    thumbnail: "https://i.ytimg.com/vi/aRSBZN2UF0Q/hqdefault.jpg",
+    publishedTimeText: "7 天前",
+    duration: "1:05",
+    viewCount: "觀看次數：17萬次",
+    streamType: "",
+    scheduledStartTime: null,
+  });
+});
+
+test("parseLockupItem - 沒有 richItemRenderer 時回傳 null", () => {
+  assert.equal(parseLockupItem({ continuationItemRenderer: {} }, "videos"), null);
+});
+
+test("parseLockupItem - 沒有 lockupViewModel 時回傳 null", () => {
+  assert.equal(
+    parseLockupItem({ richItemRenderer: { content: {} } }, "videos"),
+    null,
+  );
 });
