@@ -200,3 +200,73 @@ test("parseLockupItem - 直播中（streams 分頁）", () => {
     scheduledStartTime: null,
   });
 });
+
+const upcomingStreamItem = {
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        contentId: "1WhsM61BUfk",
+        contentImage: {
+          thumbnailViewModel: {
+            image: {
+              sources: [
+                { url: "https://i.ytimg.com/vi/1WhsM61BUfk/hqdefault.jpg" },
+              ],
+            },
+            overlays: [
+              {
+                thumbnailBottomOverlayViewModel: {
+                  badges: [
+                    {
+                      thumbnailBadgeViewModel: {
+                        text: "即將直播",
+                        badgeStyle: "THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        metadata: {
+          lockupMetadataViewModel: {
+            title: { content: "【chat talk here】" },
+            metadata: {
+              contentMetadataViewModel: {
+                metadataRows: [
+                  {
+                    metadataParts: [
+                      {
+                        text: {
+                          content: "預定發布時間：2028/3/25 下午16:09",
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+test("parseLockupItem - 即將直播（streams 分頁）", () => {
+  const result = parseLockupItem(upcomingStreamItem, "streams");
+  const expectedTime = Math.floor(
+    new Date(2028, 2, 25, 16, 9).getTime() / 1000,
+  );
+  assert.deepEqual(result, {
+    videoId: "1WhsM61BUfk",
+    title: "【chat talk here】",
+    thumbnail: "https://i.ytimg.com/vi/1WhsM61BUfk/hqdefault.jpg",
+    publishedTimeText: expectedTime,
+    duration: "",
+    viewCount: "",
+    streamType: "upcoming",
+    scheduledStartTime: expectedTime,
+  });
+});

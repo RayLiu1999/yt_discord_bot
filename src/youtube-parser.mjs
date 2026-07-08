@@ -58,8 +58,14 @@ function parseLockupItem(item, type) {
     if (badge.badgeStyle === "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE") {
       streamType = "live";
       viewCount = metadataParts[0]?.text?.content || "";
+    } else if (badge.text === "即將直播") {
+      streamType = "upcoming";
+      scheduledStartTime = parseScheduledTime(
+        metadataParts[0]?.text?.content || "",
+      );
+      publishedTimeText = scheduledStartTime;
     }
-    // Task 5、6 會補上 upcoming / ended 分支
+    // Task 6 會補上 ended 分支
   } else {
     viewCount = metadataParts[0]?.text?.content || "";
     publishedTimeText = metadataParts[1]?.text?.content || "";
