@@ -28,6 +28,15 @@ const client = new Client({
   intents: [GatewayIntentBits.DirectMessages, GatewayIntentBits.Guilds],
 });
 
+// 防止單一未預期的錯誤（例如 interaction token 過期）讓整個機器人崩潰
+client.on(Events.Error, (error) => {
+  addErrorLog("[Discord Client 錯誤]", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  addErrorLog("[未處理的 Promise rejection]", reason);
+});
+
 client.commands = new Collection();
 const foldersPath = path.join(".", "commands");
 
@@ -97,10 +106,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // 頻道限制檢查
   const allowedChannels = commandChannelMap[interaction.commandName];
   if (allowedChannels && !allowedChannels.includes(interaction.channelId)) {
-    await interaction.reply({
-      content: "此指令無法在這個頻道使用！",
-      flags: MessageFlags.Ephemeral,
-    });
+    try {
+      await interaction.reply({
+        content: "此指令無法在這個頻道使用！",
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (replyError) {
+      addErrorLog("回覆頻道限制訊息失敗", replyError);
+    }
     return;
   }
 
@@ -108,16 +121,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await command.execute(interaction);
   } catch (error) {
     addErrorLog(error);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({
-        content: "執行指令時發生錯誤！",
-        flags: MessageFlags.Ephemeral,
-      });
-    } else {
-      await interaction.reply({
-        content: "執行指令時發生錯誤！",
-        flags: MessageFlags.Ephemeral,
-      });
+    // interaction token 可能已過期或已被回應過（例如指令執行超過 3 秒才回應）
+    // 這裡的回覆本身也可能失敗，務必捕捉，否則會變成未處理的 rejection 讓整個機器人崩潰
+    try {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "執行指令時發生錯誤！",
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: "執行指令時發生錯誤！",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (replyError) {
+      addErrorLog("回覆指令錯誤訊息失敗（interaction 可能已過期）", replyError);
     }
   }
 });
