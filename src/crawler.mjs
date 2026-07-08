@@ -18,6 +18,7 @@ import {
   checkAndRemoveInactiveChannels,
   addLiveSchedule,
 } from "#src/functions";
+import { parsePageVideos } from "#src/youtube-parser";
 import config from "#src/config";
 
 const YT_domain = "https://www.youtube.com";
@@ -177,118 +178,56 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
       jsonData = jsonData.replace(/;/g, "");
       jsonData = JSON.parse(jsonData);
 
-      let tabNums;
-      switch (type) {
-        case "videos":
-          tabNums = 1;
-          break;
-        case "streams":
-          tabNums = 3;
-          break;
-      }
-      const channelID = jsonData.metadata.channelMetadataRenderer.ownerUrls[0]
-        .split("/")
-        .pop();
-      const videos =
-        jsonData.contents.twoColumnBrowseResultsRenderer.tabs[tabNums]
-          .tabRenderer.content.richGridRenderer.contents;
-      const streamTypes = ["upcoming", "live", "ended"];
-      const catchNums = 5;
+      const { channelID, items } = parsePageVideos(jsonData, type);
 
-      let index = 0;
-      for (let item of videos) {
-        if (index == catchNums) break;
-        index++;
+      for (const parsed of items) {
+        const {
+          videoId,
+          title: videoTitle,
+          thumbnail: videoThumbnail,
+          publishedTimeText: videoPublishedTime,
+          duration: videoDuration,
+          viewCount: videoViewCount,
+          streamType,
+          scheduledStartTime,
+        } = parsed;
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-        if (item.richItemRenderer !== undefined) {
-          const videoJson = item.richItemRenderer.content.videoRenderer;
-          if (!videoJson) continue;
-          const videoId = videoJson.videoId;
-          const videoTitle = videoJson.title.runs[0].text;
-          const videoThumbnail = videoJson.thumbnail.thumbnails[0].fetchUrl;
-          const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-          const peopleObj = videoJson.viewCountText;
-
-          let videoPublishedTime = "";
-          let videoDuration = "";
-          let videoViewCount = "";
-          let streamType = "";
-
+        if (streamType === "upcoming") {
+          // 將即將開始的直播存入排程，到時間時自動發送 Discord 通知
           try {
-            switch (type) {
-              case "videos":
-                videoPublishedTime =
-                  videoJson.publishedTimeText?.simpleText || "";
-                videoDuration = videoJson.lengthText?.simpleText || "";
-                videoViewCount = peopleObj?.simpleText || "";
-                break;
-
-              case "streams":
-                switch (
-                  videoJson.thumbnailOverlays[0]
-                    .thumbnailOverlayTimeStatusRenderer.style
-                ) {
-                  case "UPCOMING":
-                    let startTime = videoJson.upcomingEventData.startTime;
-                    videoPublishedTime = parseInt(startTime);
-                    streamType = streamTypes[0];
-
-                    // 將即將開始的直播存入排程，到時間時自動發送 Discord 通知
-                    try {
-                      await addLiveSchedule({
-                        videoId,
-                        channelId: channelID,
-                        title: videoTitle,
-                        discordChannelId: config.STREAM_CHANNEL_ID,
-                        scheduledStartTime: parseInt(startTime),
-                      });
-                      console.log(
-                        `[直播排程] 已新增/更新：${videoTitle} (${videoId})`,
-                      );
-                    } catch (scheduleErr) {
-                      addErrorLog(
-                        `[直播排程] 儲存失敗：${scheduleErr.message}`,
-                      );
-                    }
-                    break;
-                  case "LIVE":
-                    streamType = streamTypes[1];
-                    videoViewCount =
-                      videoJson.shortViewCountText?.runs?.[0]?.text ||
-                      videoJson.shortViewCountText?.simpleText ||
-                      "";
-                    break;
-                  case "DEFAULT":
-                    videoPublishedTime =
-                      videoJson.publishedTimeText?.simpleText || "";
-                    videoDuration = videoJson.lengthText?.simpleText || "";
-                    videoViewCount = peopleObj?.simpleText || "";
-                    streamType = streamTypes[2];
-                    break;
-                }
-            }
-          } catch (error) {
-            addErrorLog(error);
+            await addLiveSchedule({
+              videoId,
+              channelId: channelID,
+              title: videoTitle,
+              discordChannelId: config.STREAM_CHANNEL_ID,
+              scheduledStartTime,
+            });
+            console.log(
+              `[直播排程] 已新增/更新：${videoTitle} (${videoId})`,
+            );
+          } catch (scheduleErr) {
+            addErrorLog(`[直播排程] 儲存失敗：${scheduleErr.message}`);
           }
-
-          // 檢查是否已發送（使用 videoId 欄位比對）
-          if (checkIsSended(sendedVideosOrStreams, videoId)) {
-            continue;
-          }
-
-          if (!checkTime(videoPublishedTime || new Date() / 1000)) continue;
-
-          crawlerResults.push({
-            id: videoId,
-            title: videoTitle,
-            link: videoUrl,
-            pic: videoThumbnail,
-            time: videoPublishedTime || "直播中",
-            duration: videoDuration || "無",
-            views: videoViewCount,
-            channelId: channelID,
-          });
         }
+
+        // 檢查是否已發送（使用 videoId 欄位比對）
+        if (checkIsSended(sendedVideosOrStreams, videoId)) {
+          continue;
+        }
+
+        if (!checkTime(videoPublishedTime || new Date() / 1000)) continue;
+
+        crawlerResults.push({
+          id: videoId,
+          title: videoTitle,
+          link: videoUrl,
+          pic: videoThumbnail,
+          time: videoPublishedTime || "直播中",
+          duration: videoDuration || "無",
+          views: videoViewCount,
+          channelId: channelID,
+        });
       }
 
       return {
