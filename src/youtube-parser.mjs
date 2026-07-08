@@ -60,9 +60,9 @@ function parseLockupItem(item, type) {
       viewCount = metadataParts[0]?.text?.content || "";
     } else if (badge.text === "即將直播") {
       streamType = "upcoming";
-      scheduledStartTime = parseScheduledTime(
-        metadataParts[0]?.text?.content || "",
-      );
+      scheduledStartTime = metadataParts
+        .map((part) => parseScheduledTime(part?.text?.content || ""))
+        .find((time) => time !== null) ?? null;
       publishedTimeText = scheduledStartTime;
     } else {
       streamType = "ended";

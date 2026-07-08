@@ -271,6 +271,81 @@ test("parseLockupItem - 即將直播（streams 分頁）", () => {
   });
 });
 
+const upcomingStreamWithWaitCountItem = {
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        contentId: "2XyN73CWmkL",
+        contentImage: {
+          thumbnailViewModel: {
+            image: {
+              sources: [
+                { url: "https://i.ytimg.com/vi/2XyN73CWmkL/hqdefault.jpg" },
+              ],
+            },
+            overlays: [
+              {
+                thumbnailBottomOverlayViewModel: {
+                  badges: [
+                    {
+                      thumbnailBadgeViewModel: {
+                        text: "即將直播",
+                        badgeStyle: "THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        metadata: {
+          lockupMetadataViewModel: {
+            title: { content: "【Nijisanji】waiting room" },
+            metadata: {
+              contentMetadataViewModel: {
+                metadataRows: [
+                  {
+                    metadataParts: [
+                      {
+                        text: {
+                          content: "4 人正在等候",
+                        },
+                      },
+                      {
+                        text: {
+                          content: "預定發布時間：2026/7/30 凌晨2:00",
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+test("parseLockupItem - 即將直播且有等候人數（streams 分頁，metadataParts[0] 為等候人數）", () => {
+  const result = parseLockupItem(upcomingStreamWithWaitCountItem, "streams");
+  const expectedTime = Math.floor(
+    new Date(2026, 6, 30, 2, 0).getTime() / 1000,
+  );
+  assert.deepEqual(result, {
+    videoId: "2XyN73CWmkL",
+    title: "【Nijisanji】waiting room",
+    thumbnail: "https://i.ytimg.com/vi/2XyN73CWmkL/hqdefault.jpg",
+    publishedTimeText: expectedTime,
+    duration: "",
+    viewCount: "",
+    streamType: "upcoming",
+    scheduledStartTime: expectedTime,
+  });
+});
+
 const endedStreamItem = {
   richItemRenderer: {
     content: {
