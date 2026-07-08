@@ -1,0 +1,119 @@
+// YouTube 頻道頁面新版 lockupViewModel 資料結構的純解析函式
+// 注意：不處理網路請求、不碰資料庫，方便單元測試
+
+// 從縮圖 overlay 陣列中找出狀態 badge（例如「直播」「即將直播」或影片時長）
+function extractBadge(lockup) {
+  const overlays = lockup?.contentImage?.thumbnailViewModel?.overlays || [];
+  const bottomOverlay = overlays.find(
+    (o) => o.thumbnailBottomOverlayViewModel,
+  );
+  const badge =
+    bottomOverlay?.thumbnailBottomOverlayViewModel?.badges?.[0]
+      ?.thumbnailBadgeViewModel;
+
+  return {
+    text: badge?.text || "",
+    badgeStyle: badge?.badgeStyle || "",
+  };
+}
+
+// 將「預定發布時間：YYYY/M/D 上午|下午HH:MM」字串轉成 unix 秒數
+// 注意：HH 已經是 24 小時制，上午/下午僅為顯示用前綴，不影響計算
+// 注意：此處是以「主機所在時區」建構 Date 物件，其正確性依賴主機 OS 時區
+// 與 YouTube 顯示此字串時所用的時區一致（字串本身不帶明確的 UTC 偏移），
+// 部署到正式環境前務必再次核對主機時區。
+function parseScheduledTime(text) {
+  if (!text) return null;
+
+  const match = text.match(
+    /(\d{4})\/(\d{1,2})\/(\d{1,2})\D*(\d{1,2}):(\d{2})/,
+  );
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute] = match.map(Number);
+  const date = new Date(year, month - 1, day, hour, minute);
+  return Math.floor(date.getTime() / 1000);
+}
+
+// 解析單一 richItemRenderer 項目。type 為 "videos" 或 "streams"，
+// 影響 metadataRows 與 badge 的判讀方式。找不到資料時回傳 null。
+function parseLockupItem(item, type) {
+  const lockup = item?.richItemRenderer?.content?.lockupViewModel;
+  if (!lockup) return null;
+
+  const videoId = lockup.contentId || "";
+  const title =
+    lockup.metadata?.lockupMetadataViewModel?.title?.content || "";
+  const thumbnail =
+    lockup.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url || "";
+  const badge = extractBadge(lockup);
+  const metadataParts =
+    lockup.metadata?.lockupMetadataViewModel?.metadata
+      ?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts || [];
+
+  let streamType = "";
+  let publishedTimeText = "";
+  let duration = "";
+  let viewCount = "";
+  let scheduledStartTime = null;
+
+  if (type === "streams") {
+    if (badge.badgeStyle === "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE") {
+      streamType = "live";
+      viewCount = metadataParts[0]?.text?.content || "";
+    } else if (badge.text === "即將直播") {
+      streamType = "upcoming";
+      scheduledStartTime = metadataParts
+        .map((part) => parseScheduledTime(part?.text?.content || ""))
+        .find((time) => time !== null) ?? null;
+      publishedTimeText = scheduledStartTime;
+    } else {
+      streamType = "ended";
+      viewCount = metadataParts[0]?.text?.content || "";
+      publishedTimeText = metadataParts[1]?.text?.content || "";
+      duration = badge.text || "";
+    }
+  } else {
+    viewCount = metadataParts[0]?.text?.content || "";
+    publishedTimeText = metadataParts[1]?.text?.content || "";
+    duration = badge.text || "";
+  }
+
+  return {
+    videoId,
+    title,
+    thumbnail,
+    publishedTimeText,
+    duration,
+    viewCount,
+    streamType,
+    scheduledStartTime,
+  };
+}
+
+// 從整頁 ytInitialData JSON 取出頻道 ID 與指定分頁（videos/streams）前 catchNums 筆解析結果
+function parsePageVideos(jsonData, type, catchNums = 5) {
+  const channelID = jsonData.metadata.channelMetadataRenderer.ownerUrls[0]
+    .split("/")
+    .pop();
+
+  const tabNums = type === "streams" ? 3 : 1;
+  const contents =
+    jsonData.contents.twoColumnBrowseResultsRenderer.tabs[tabNums]
+      .tabRenderer.content.richGridRenderer.contents;
+
+  const items = [];
+  for (let i = 0; i < contents.length && i < catchNums; i++) {
+    const parsed = parseLockupItem(contents[i], type);
+    if (parsed) items.push(parsed);
+  }
+
+  return { channelID, items };
+}
+
+export {
+  extractBadge,
+  parseScheduledTime,
+  parseLockupItem,
+  parsePageVideos,
+};
