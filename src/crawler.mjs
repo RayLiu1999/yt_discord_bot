@@ -194,6 +194,16 @@ async function fetchCrawler(url, type, sendedVideosOrStreams) {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
         if (streamType === "upcoming") {
+          if (scheduledStartTime === null) {
+            // 無法從頁面解析出排程時間（可能是未知的 YouTube UI 變體），
+            // 沒有意義的時間可寫入排程，也無法判斷是否為當日內容，故略過
+            // 該項目並記錄錯誤以便後續排查
+            addErrorLog(
+              `[直播排程] 無法解析排程時間，略過：${videoTitle} (${videoId})`,
+            );
+            continue;
+          }
+
           // 將即將開始的直播存入排程，到時間時自動發送 Discord 通知
           try {
             await addLiveSchedule({

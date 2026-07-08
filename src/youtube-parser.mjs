@@ -19,6 +19,9 @@ function extractBadge(lockup) {
 
 // 將「預定發布時間：YYYY/M/D 上午|下午HH:MM」字串轉成 unix 秒數
 // 注意：HH 已經是 24 小時制，上午/下午僅為顯示用前綴，不影響計算
+// 注意：此處是以「主機所在時區」建構 Date 物件，其正確性依賴主機 OS 時區
+// 與 YouTube 顯示此字串時所用的時區一致（字串本身不帶明確的 UTC 偏移），
+// 部署到正式環境前務必再次核對主機時區。
 function parseScheduledTime(text) {
   if (!text) return null;
 

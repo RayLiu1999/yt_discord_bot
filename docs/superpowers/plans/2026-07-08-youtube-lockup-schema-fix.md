@@ -1252,3 +1252,8 @@ rm __verify.mjs
 - **Spec coverage：** 一般影片解析（Task 3）、直播中（Task 4）、即將直播含排程（Task 5）、已結束直播（Task 6）、整頁與 catchNums 邏輯（Task 7）、實際接回 crawler.mjs（Task 8）、真實資料 + 時區驗證（Task 9）都各自對應到使用者要求的「YouTube 改版導致抓不到資料」問題，沒有遺漏。
 - **Placeholder 檢查：** 每個 Step 都附完整程式碼與明確的預期輸出，沒有「TODO」「之後補上」等字樣。
 - **型別/命名一致性：** `ParsedItem` 的欄位名稱（`videoId`、`title`、`thumbnail`、`publishedTimeText`、`duration`、`viewCount`、`streamType`、`scheduledStartTime`）從 Task 3 定義後，Task 4-8 全部沿用同一組名稱，沒有前後不一致的情況；`crawlerResults` 的既有欄位名稱（`id`/`link`/`pic`/`time`/`duration`/`views`/`channelId`）在 Task 8 中維持不變，符合 Global Constraints。
+
+## 已知限制（Task 9 驗證發現，非本次修復範圍）
+
+- **Corp/品牌頻道多分頁版型不支援：** Task 9 人工驗證時發現，部分採用「品牌/公司帳號」多分頁版型的頻道（例如 `@Kamitsubaki_JP`）其 `ytInitialData` 結構與一般個人頻道不同，導致 `parsePageVideos` 依既定分頁索引（`tabs[1]`／`tabs[3]`）取值時，對應的 `tabRenderer` 為 `undefined`，解析失敗。目前這種情況會被 `fetchCrawler` 既有的 `.catch()` 攔截，並回報為「頻道抓取失敗」，但實際上這並非網路或 HTTP 錯誤，而是頁面版型尚未支援所導致的解析落差，訊息標示上容易誤導排查方向。此為已知、接受的限制，不在本次修復範圍內處理。
+- **時區假設僅在驗證環境自洽驗證：** `parseScheduledTime` 是以主機所在時區建構 `Date` 物件（詳見 `src/youtube-parser.mjs` 內註解）。Task 9 驗證時，驗證用的沙箱環境其作業系統時區恰好與其對外連線所在地時區一致，因此換算結果「看起來」正確，但這只是巧合，並未涵蓋正式環境主機時區與該沙箱不同的情況。在正式部署、且直播通知功能的計時準確度需要被完全信任之前，務必另外核對正式主機的作業系統時區設定是否與 YouTube 顯示時間所預期的時區一致。
