@@ -2,6 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractBadge, parseScheduledTime, parseLockupItem, parsePageVideos } from "#src/youtube-parser";
 
+// 獨立於 src/youtube-parser.mjs 實作之外的測試用換算：
+// 「預定發布時間」字串固定以 America/Los_Angeles 呈現，測試中使用的日期
+// 都落在該時區的日光節約時間（PDT，UTC-7），故直接用固定 -7 小時換算成 UTC。
+function pdtWallClockToEpochSeconds(year, month, day, hour, minute) {
+  return Math.floor(Date.UTC(year, month - 1, day, hour + 7, minute) / 1000);
+}
+
 test("extractBadge - 從 thumbnailBottomOverlayViewModel 取出 badge", () => {
   const lockup = {
     contentImage: {
@@ -46,19 +53,28 @@ test("extractBadge - 完全沒有 contentImage 時不拋例外", () => {
 
 test("parseScheduledTime - 解析下午時間", () => {
   const result = parseScheduledTime("預定發布時間：2028/3/25 下午16:09");
-  const expected = Math.floor(new Date(2028, 2, 25, 16, 9).getTime() / 1000);
+  const expected = pdtWallClockToEpochSeconds(2028, 3, 25, 16, 9);
   assert.equal(result, expected);
 });
 
 test("parseScheduledTime - 解析上午時間", () => {
   const result = parseScheduledTime("預定發布時間：2026/7/9 上午9:30");
-  const expected = Math.floor(new Date(2026, 6, 9, 9, 30).getTime() / 1000);
+  const expected = pdtWallClockToEpochSeconds(2026, 7, 9, 9, 30);
   assert.equal(result, expected);
 });
 
 test("parseScheduledTime - 格式不符回傳 null", () => {
   assert.equal(parseScheduledTime("觀看次數：17萬次"), null);
   assert.equal(parseScheduledTime(""), null);
+});
+
+// 迴歸測試：與真實直播（videoId dO71XO4lceM，2026-07-21 驗證）的頻道頁排程文字
+// 及觀看頁 playabilityStatus.liveStreamability...offlineSlate.scheduledStartTime
+// （不受地區影響的原始 unix timestamp = 1784664900）比對而來，
+// 確保排程時間換算不再以主機時區誤判。
+test("parseScheduledTime - 與真實直播 ground truth 時間戳比對（America/Los_Angeles 換算）", () => {
+  const result = parseScheduledTime("預定發布時間：2026/7/21 下午13:15");
+  assert.equal(result, 1784664900);
 });
 
 const normalVideoItem = {
@@ -256,9 +272,7 @@ const upcomingStreamItem = {
 
 test("parseLockupItem - 即將直播（streams 分頁）", () => {
   const result = parseLockupItem(upcomingStreamItem, "streams");
-  const expectedTime = Math.floor(
-    new Date(2028, 2, 25, 16, 9).getTime() / 1000,
-  );
+  const expectedTime = pdtWallClockToEpochSeconds(2028, 3, 25, 16, 9);
   assert.deepEqual(result, {
     videoId: "1WhsM61BUfk",
     title: "【chat talk here】",
@@ -331,9 +345,7 @@ const upcomingStreamWithWaitCountItem = {
 
 test("parseLockupItem - 即將直播且有等候人數（streams 分頁，metadataParts[0] 為等候人數）", () => {
   const result = parseLockupItem(upcomingStreamWithWaitCountItem, "streams");
-  const expectedTime = Math.floor(
-    new Date(2026, 6, 30, 2, 0).getTime() / 1000,
-  );
+  const expectedTime = pdtWallClockToEpochSeconds(2026, 7, 30, 2, 0);
   assert.deepEqual(result, {
     videoId: "2XyN73CWmkL",
     title: "【Nijisanji】waiting room",

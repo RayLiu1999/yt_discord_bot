@@ -17,11 +17,54 @@ function extractBadge(lockup) {
   };
 }
 
+// 頻道頁面「即將直播」的「預定發布時間」字串固定以 America/Los_Angeles
+// （YouTube 後台預設時區）呈現，與抓取時送出的 Accept-Language 標頭、
+// 或主機所在時區完全無關（不受地區影響）。已用真實直播比對觀看頁
+// playabilityStatus.liveStreamability...offlineSlate.scheduledStartTime
+// （原始、不受地區影響的 unix timestamp）驗證確認：主機時區若非
+// America/Los_Angeles，用主機本地時區直接建構 Date 物件會導致排程時間
+// 誤差達數小時到十幾小時，使直播通知提早或延後觸發。
+const SCHEDULE_TIME_ZONE = "America/Los_Angeles";
+
+// 計算指定 IANA 時區在某個 UTC 時間點的偏移分鐘數（正值代表比 UTC 快）
+function getTimeZoneOffsetMinutes(timeZone, utcDate) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(utcDate).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const asUTC = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return (asUTC - utcDate.getTime()) / 60000;
+}
+
+// 將指定時區的「掛鐘時間」（年月日時分）轉換成 unix 秒數，自動處理該時區的日光節約時間
+function zonedTimeToEpochSeconds(year, month, day, hour, minute, timeZone) {
+  const utcGuessMs = Date.UTC(year, month - 1, day, hour, minute);
+  const offsetMinutes = getTimeZoneOffsetMinutes(
+    timeZone,
+    new Date(utcGuessMs),
+  );
+  return Math.floor((utcGuessMs - offsetMinutes * 60000) / 1000);
+}
+
 // 將「預定發布時間：YYYY/M/D 上午|下午HH:MM」字串轉成 unix 秒數
 // 注意：HH 已經是 24 小時制，上午/下午僅為顯示用前綴，不影響計算
-// 注意：此處是以「主機所在時區」建構 Date 物件，其正確性依賴主機 OS 時區
-// 與 YouTube 顯示此字串時所用的時區一致（字串本身不帶明確的 UTC 偏移），
-// 部署到正式環境前務必再次核對主機時區。
 function parseScheduledTime(text) {
   if (!text) return null;
 
@@ -31,8 +74,14 @@ function parseScheduledTime(text) {
   if (!match) return null;
 
   const [, year, month, day, hour, minute] = match.map(Number);
-  const date = new Date(year, month - 1, day, hour, minute);
-  return Math.floor(date.getTime() / 1000);
+  return zonedTimeToEpochSeconds(
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    SCHEDULE_TIME_ZONE,
+  );
 }
 
 // 解析單一 richItemRenderer 項目。type 為 "videos" 或 "streams"，
